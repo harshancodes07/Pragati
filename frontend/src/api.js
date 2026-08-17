@@ -44,6 +44,7 @@ export const api = {
 
   ask: (body) => request('/ask', json(body)),
   teachBack: (body) => request('/teachback', json(body)),
+  doubt: (body) => request('/doubt', json(body)),
   practice: (body) => request('/practice', json(body)),
   submitPractice: (body) => request('/practice/submit', json(body)),
   progress: (sessionId) => request(`/progress/${sessionId}`),

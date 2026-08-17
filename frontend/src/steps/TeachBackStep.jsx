@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api, isIndicScript } from '../api'
 import { Badge, Button, Card, ErrorNote, Reveal, Skeleton } from '../components/common'
 import { DifficultyShift } from '../components/DifficultyShift'
+import { DoubtChat } from '../components/DoubtChat'
 import { ScoreDashboard } from '../components/ScoreDashboard'
 import { MicButton, SpeakButton } from '../components/VoiceButton'
 
@@ -170,27 +171,35 @@ export function TeachBackStep({
             />
           )}
 
-          <Card className="space-y-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xl">{verdict.icon}</span>
-              <Badge tone={verdict.tone}>{verdict.label}</Badge>
-            </div>
+          <DoubtChat
+            concept={topic}
+            explanation={result.feedback}
+            language={language}
+            documentId={doc.document_id}
+            sessionId={doc.session_id}
+          >
+            <Card className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">{verdict.icon}</span>
+                <Badge tone={verdict.tone}>{verdict.label}</Badge>
+              </div>
 
-            {result.feedback && (
-              <>
-                <p className={`text-[15px] leading-relaxed ${indic ? 'script-indic' : ''}`}>
-                  {result.feedback}
-                </p>
-                {voice && (
-                  <SpeakButton
-                    text={result.feedback}
-                    language={language}
-                    autoPlay={autoSpeak}
-                  />
-                )}
-              </>
-            )}
-          </Card>
+              {result.feedback && (
+                <>
+                  <p className={`text-[15px] leading-relaxed ${indic ? 'script-indic' : ''}`}>
+                    {result.feedback}
+                  </p>
+                  {voice && (
+                    <SpeakButton
+                      text={result.feedback}
+                      language={language}
+                      autoPlay={autoSpeak}
+                    />
+                  )}
+                </>
+              )}
+            </Card>
+          </DoubtChat>
 
           <div className="grid gap-4 sm:grid-cols-2">
             {result.did_well?.length > 0 && (

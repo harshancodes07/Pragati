@@ -78,6 +78,39 @@ def stream_tutor_response(question: str, chunks: list[dict], language: str) -> I
     )
 
 
+# ------------------------------------------------------------- 1b. doubt chat
+
+# The floating chat is a quick clarification loop, not a research session —
+# capping the turns sent to the model bounds token growth even though the
+# frontend keeps the full thread on screen.
+_MAX_DOUBT_HISTORY = 10
+
+
+def _trim_doubt_history(history: list[dict[str, str]]) -> list[dict[str, str]]:
+    return history[-_MAX_DOUBT_HISTORY:] if len(history) > _MAX_DOUBT_HISTORY else history
+
+
+def answer_doubt(
+    explanation: str,
+    concept: str,
+    chunks: list[dict],
+    language: str,
+    history: list[dict[str, str]],
+) -> str:
+    """Answer a follow-up question about an explanation the student already read."""
+    anchor = (
+        f"{prompts.build_context_block(chunks)}\n\n"
+        f'The explanation already given to the student about "{concept}":\n'
+        f'"""\n{explanation}\n"""\n\n'
+        f"{prompts.language_reminder(language)}"
+    )
+    system = f"{prompts.doubt_chat_system_prompt(language)}\n\n{anchor}"
+    messages = [{"role": "system", "content": system}, *_trim_doubt_history(history)]
+    return get_provider().chat(
+        messages, task="doubt", model=settings.tutor_model, temperature=0.5, max_tokens=500,
+    )
+
+
 # -------------------------------------------------------------- 2. teach-back
 
 _VALID_UNDERSTANDING = {"correct", "partial", "misconception", "incorrect"}

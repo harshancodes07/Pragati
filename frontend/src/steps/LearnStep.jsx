@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { api, isIndicScript } from '../api'
 import { Button, Card, ErrorNote, Reveal, Skeleton } from '../components/common'
+import { DoubtChat } from '../components/DoubtChat'
 import { GroundingCard } from '../components/GroundingCard'
 import { MicButton, SpeakButton } from '../components/VoiceButton'
 
 export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught }) {
   const [question, setQuestion] = useState('')
+  const [askedQuestion, setAskedQuestion] = useState('')
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -25,6 +27,7 @@ export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught
         language,
       })
       setResult(res)
+      setAskedQuestion(asked)
       if (res.grounded) onTaught(asked)
     } catch (e) {
       setError(e.message)
@@ -80,24 +83,32 @@ export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught
 
       {result && (
         <div className="space-y-4">
-          <Card className="space-y-3">
-            <p
-              className={`whitespace-pre-wrap text-[15px] leading-relaxed ${
-                isIndicScript(language) ? 'script-indic' : ''
-              }`}
-            >
-              {result.answer}
-            </p>
-            {voice && (
-              <div className="border-t border-line pt-3">
-                <SpeakButton
-                  text={result.answer}
-                  language={language}
-                  autoPlay={autoSpeak}
-                />
-              </div>
-            )}
-          </Card>
+          <DoubtChat
+            concept={askedQuestion}
+            explanation={result.answer}
+            language={language}
+            documentId={doc.document_id}
+            sessionId={doc.session_id}
+          >
+            <Card className="space-y-3">
+              <p
+                className={`whitespace-pre-wrap text-[15px] leading-relaxed ${
+                  isIndicScript(language) ? 'script-indic' : ''
+                }`}
+              >
+                {result.answer}
+              </p>
+              {voice && (
+                <div className="border-t border-line pt-3">
+                  <SpeakButton
+                    text={result.answer}
+                    language={language}
+                    autoPlay={autoSpeak}
+                  />
+                </div>
+              )}
+            </Card>
+          </DoubtChat>
 
           <GroundingCard
             sources={result.sources}

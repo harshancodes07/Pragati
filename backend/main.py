@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,6 +83,22 @@ class SubmitRequest(BaseModel):
     set_id: str
     answers: dict[str, str]
     concept: str = ""
+
+
+class DoubtMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class DoubtRequest(BaseModel):
+    document_id: str | None = None
+    session_id: str
+    concept: str = Field(default="", max_length=500)
+    explanation: str = Field(min_length=1, max_length=6000)
+    language: str = "tanglish"
+    # The whole thread, ending with the student's latest doubt. Stateless by
+    # design — the popup owns history, matching how sessions carry no chat log.
+    messages: list[DoubtMessage] = Field(default_factory=list, max_length=20)
 
 
 class TTSRequest(BaseModel):
@@ -414,6 +430,40 @@ def teach_back(req: TeachBackRequest) -> dict[str, Any]:
     }
     db.log_interaction(req.session_id, "teachback", req.concept, payload)
     return payload
+
+
+# ---------------------------------------------------------------------- doubt
+
+@app.post("/api/doubt")
+def doubt(req: DoubtRequest) -> dict[str, Any]:
+    """Follow-up chat anchored to one already-generated explanation."""
+    session = db.get_session(req.session_id)
+    if session is None:
+        raise HTTPException(404, "Session not found.")
+    if not req.messages or req.messages[-1].role != "user":
+        raise HTTPException(400, "The last message must be the student's doubt.")
+
+    latest = req.messages[-1].content
+    # Never refuse here — a doubt about content already taught should always
+    # get the best-available evidence, the way teachback grades on it too.
+    result = retrieve(
+        f"{req.concept}. {latest}",
+        document_id=req.document_id or session.get("document_id"),
+        threshold=0.0,
+    )
+
+    try:
+        answer = service.answer_doubt(
+            req.explanation,
+            req.concept,
+            result.chunks,
+            req.language,
+            [m.model_dump() for m in req.messages],
+        )
+    except NIMError as exc:
+        raise HTTPException(503, "Couldn't answer that. Try again.") from exc
+
+    return {"answer": answer, "sources": result.to_sources(2)}
 
 
 # ------------------------------------------------------------------ practice

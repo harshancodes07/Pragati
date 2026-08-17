@@ -25,6 +25,7 @@ from backend.llm.service import (
     _normalise_practice,
     _normalise_teach_back,
     _resolve_option,
+    _trim_doubt_history,
 )
 from backend.rag.store import NumpyVectorStore
 from backend.speech.langs import bcp47, needs_transliteration, stt_mode
@@ -522,3 +523,20 @@ def test_feedback_lists_are_capped():
         "improve": [f"fix {i}" for i in range(9)],
     })
     assert len(out["did_well"]) == 4 and len(out["improve"]) == 4
+
+
+# --------------------------------------------------------------- doubt chat
+
+
+def test_doubt_history_trimmed_to_recent_turns():
+    """Bounds tokens sent to the model; the frontend keeps the full thread."""
+    long = [{"role": "user", "content": str(i)} for i in range(14)]
+    trimmed = _trim_doubt_history(long)
+    assert len(trimmed) == 10
+    assert trimmed[0]["content"] == "4"
+    assert trimmed[-1]["content"] == "13"
+
+
+def test_doubt_history_untouched_when_short():
+    short = [{"role": "user", "content": "why is that?"}]
+    assert _trim_doubt_history(short) == short
