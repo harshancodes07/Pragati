@@ -6,6 +6,7 @@ Every NIM call happens here or below. The frontend never sees the API key.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -22,6 +23,12 @@ from backend.llm.provider import NIMError, get_provider, stats
 from backend.rag.embeddings import embed_passages
 from backend.rag.retrieve import out_of_scope_message, retrieve
 from backend.rag.store import get_store
+from backend.speech import service as speech_service
+from backend.speech.provider import SpeechError, speech_stats
+
+def _elapsed_ms(started: float) -> float:
+    return (time.perf_counter() - started) * 1000
+
 
 app = FastAPI(title="Bodhi", version="1.0")
 
@@ -76,6 +83,11 @@ class SubmitRequest(BaseModel):
     concept: str = ""
 
 
+class TTSRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=6000)
+    language: str = "tanglish"
+
+
 # -------------------------------------------------------------------- health
 
 @app.get("/api/health")
@@ -104,6 +116,16 @@ def health() -> dict[str, Any]:
         },
         "index": {"chunks": len(get_store())},
         "grounding_threshold": settings.grounding_threshold,
+        # The frontend hides every mic and speaker button when this is false, so
+        # a missing key degrades to exactly the app we had before voice existed.
+        "speech": {
+            "configured": bool(settings.sarvam_api_key),
+            "detail": (
+                f"{settings.sarvam_stt_model} / {settings.sarvam_tts_model}"
+                if settings.sarvam_api_key
+                else "SARVAM_API_KEY not set"
+            ),
+        },
     }
 
 
@@ -116,31 +138,48 @@ async def upload(
     title: str | None = Form(default=None),
     language: str = Form(default="tanglish"),
 ) -> dict[str, Any]:
+    # Timed per stage so a slow upload can be diagnosed from the response alone
+    # — OCR, embedding and file transfer all live on wildly different budgets,
+    # and guessing which one is slow from the outside wastes a support cycle.
+    timing_ms: dict[str, float] = {}
+    started = time.perf_counter()
+
     try:
         if file is not None:
             data = await file.read()
             if not data:
                 raise HTTPException(400, "That file is empty.")
+            timing_ms["read_upload"] = _elapsed_ms(started)
+
+            t = time.perf_counter()
             pages, meta = extract(data=data, filename=file.filename or "")
+            timing_ms["extract"] = _elapsed_ms(t)
             doc_title = title or file.filename or "Untitled"
         else:
+            t = time.perf_counter()
             pages, meta = extract(text=text or "")
+            timing_ms["extract"] = _elapsed_ms(t)
             doc_title = title or "Pasted text"
     except ExtractionError as exc:
         raise HTTPException(400, str(exc)) from exc
     except NIMError as exc:
         raise HTTPException(503, f"Couldn't process that upload: {exc}") from exc
 
+    t = time.perf_counter()
     doc_id = db.create_document(doc_title, meta.get("source", "unknown"), len(pages), 0)
     chunks = chunk_pages(pages, doc_id)
     if not chunks:
         raise HTTPException(400, "Couldn't find any teachable content in that upload.")
+    timing_ms["chunk"] = _elapsed_ms(t)
 
+    t = time.perf_counter()
     try:
         vectors = embed_passages([c["text"] for c in chunks])
     except NIMError as exc:
         raise HTTPException(503, f"Couldn't index that document: {exc}") from exc
+    timing_ms["embed"] = _elapsed_ms(t)
 
+    t = time.perf_counter()
     store = get_store()
     store.add(chunks, vectors)
     store.save()
@@ -149,8 +188,9 @@ async def upload(
         "UPDATE documents SET chunk_count = ? WHERE id = ?", (len(chunks), doc_id)
     )
     db.get_conn().commit()
-
     session_id = db.create_session(doc_id, language)
+    timing_ms["store"] = _elapsed_ms(t)
+    timing_ms["total"] = _elapsed_ms(started)
 
     return {
         "document_id": doc_id,
@@ -161,7 +201,47 @@ async def upload(
         "ocr_pages": meta.get("ocr_pages", 0),
         "cached": meta.get("cached", False),
         "preview": chunks[0]["text"][:400],
+        "timing_ms": {k: round(v) for k, v in timing_ms.items()},
     }
+
+
+# ------------------------------------------------------------------- speech
+
+def _require_voice() -> None:
+    if not settings.sarvam_api_key:
+        raise HTTPException(503, "Voice is not configured. Set SARVAM_API_KEY in .env.")
+
+
+@app.post("/api/stt")
+async def speech_to_text(
+    file: UploadFile = File(...),
+    language: str = Form(default="tanglish"),
+) -> dict[str, Any]:
+    """Recording -> text. Tanglish comes back romanised, ready for the textarea."""
+    _require_voice()
+    audio = await file.read()
+    if not audio:
+        raise HTTPException(400, "That recording was empty.")
+
+    try:
+        return speech_service.transcribe_audio(
+            audio,
+            filename=file.filename or "recording.wav",
+            mime=file.content_type or "audio/wav",
+            language=language,
+        )
+    except SpeechError as exc:
+        raise HTTPException(503, f"Couldn't hear that: {exc}") from exc
+
+
+@app.post("/api/tts")
+def text_to_speech(req: TTSRequest) -> dict[str, Any]:
+    """Text -> ordered base64 mp3 clips for the browser to play in sequence."""
+    _require_voice()
+    try:
+        return speech_service.speak(req.text, req.language)
+    except SpeechError as exc:
+        raise HTTPException(503, f"Couldn't read that out: {exc}") from exc
 
 
 # ----------------------------------------------------------------------- ask
@@ -379,8 +459,13 @@ def documents() -> dict[str, Any]:
 @app.get("/api/stats")
 def get_stats() -> dict[str, Any]:
     """Judge mode: proves the out-of-scope refusal spends no NIM call."""
+    speech = speech_stats.snapshot()
     return {
         **stats.snapshot(),
+        # Counted separately: nim_calls must keep meaning "LLM calls", or the
+        # refusal-spends-nothing proof stops proving anything.
+        "speech_calls": speech["nim_calls"],
+        "speech_by_task": speech["by_task"],
         "indexed_chunks": len(get_store()),
         "grounding_threshold": settings.grounding_threshold,
         "models": {

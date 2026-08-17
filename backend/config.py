@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     chunk_size: int = 120
     chunk_overlap: int = 25
 
+    # Sarvam AI — voice only. NVIDIA's catalogue reaches no speech model on this
+    # key (only riva-translate, which is text), and Riva's TTS voices skip Tamil
+    # anyway. Blank key simply disables voice; the rest of the app is unaffected.
+    sarvam_api_key: str = ""
+    sarvam_base_url: str = "https://api.sarvam.ai"
+    sarvam_stt_model: str = "saaras:v3"
+    sarvam_tts_model: str = "bulbul:v3"
+    sarvam_tts_speaker: str = "priya"
+
     data_dir: Path = ROOT / "data"
     db_path: Path = ROOT / "data" / "bodhi.db"
 

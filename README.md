@@ -21,7 +21,10 @@ python -m scripts.benchmark_nim --list          # what your key can reach
 python -m scripts.benchmark_nim                 # score the top candidates
 #    → copy the printed NVIDIA_MODEL / NVIDIA_MODEL_BACKUP lines into .env
 
-# 4. Frontend deps
+# 4. Voice (optional) — paste SARVAM_API_KEY from dashboard.sarvam.ai into .env
+#    Leave it blank and the app runs exactly as before, minus the mic/speaker.
+
+# 5. Frontend deps
 cd frontend && npm install
 ```
 
@@ -38,7 +41,7 @@ cd frontend && npm run dev        # http://localhost:5173
 ## Verify
 
 ```bash
-python -m pytest tests/ -q        # 49 unit tests, no API key needed
+python -m pytest tests/ -q        # 67 unit tests, no API key needed
 python -m scripts.demo_check      # full judge sequence against a live backend
 ```
 
@@ -64,8 +67,14 @@ PyMuPDF  embed +     NIM provider
               NVIDIA NIM /v1/chat/completions
 ```
 
-**NVIDIA NIM is the single external dependency** — chat, vision OCR and
-embeddings all run through it, so there is one key and one failure domain.
+**NVIDIA NIM is the single external dependency for reasoning** — chat, vision OCR
+and embeddings all run through it, so there is one key and one failure domain.
+
+**Voice is a second, optional domain.** No model this NVIDIA key reaches does
+speech (only `riva-translate`, which is text), and Riva's TTS voices skip Tamil
+regardless — so speech-to-text, text-to-speech and transliteration go to Sarvam
+AI. It is isolated by design: its own provider, its own counters, and a blank
+`SARVAM_API_KEY` simply hides the voice UI instead of breaking anything.
 
 ### Design decisions worth knowing
 
@@ -75,9 +84,17 @@ embeddings all run through it, so there is one key and one failure domain.
 | **Refusal decided on retrieval scores, not by the LLM** | A prompt-only guardrail can be argued out of refusing. This one is deterministic, instant, and spends zero generation calls — provable live via `/api/stats`. |
 | **No `json_schema` response format** | Support varies per NIM model. We use a tolerant parser + one repair retry + Pydantic defaults, then degrade gracefully rather than erroring at a judge. |
 | **Three system prompts, not one** | Teaching, grading and question-writing have different objectives and output contracts. |
-| **Language rules, not example sentences** | Hardcoded examples get parroted verbatim. Register rules generalise. |
+| **Language rules, not example sentences** | Hardcoded examples get parroted verbatim. Register rules generalise. Bit us for real once already: the OCR prompt's `e.g. [Diagram: cross-section of a leaf]` line made the vision model return exactly that string as the entire transcription of an unrelated page. |
+| **A model's chat capability is not its vision capability** | `chat()`'s backup-model retry is disabled for OCR (`allow_backup=False`). The configured text backup can't accept images, so a failed vision call was retrying on a model guaranteed to reject it — and that rejection ("multimodal processing is not enabled") was overwriting the real error. |
 | **Short answers are never auto-graded** | Keyword matching would mark correct Tanglish wrong — precisely the failure this product exists to prevent. |
 | **SQLite, no auth** | Auth earns zero rubric points and costs demo time. |
+| **Tanglish is transliterated before it is spoken** | Tanglish is Tamil in Latin script. An English voice mangles the words; a Tamil voice can't read the letters. So the text is converted to Tamil script for the audio only — the screen still shows Latin. |
+| **Speech-to-text uses Sarvam's `translit` mode** | A student speaks Tamil and the textarea fills with romanised text — the exact format every other layer already expects, with no conversion step on the way in. |
+| **Voice calls counted separately from NIM calls** | `nim_calls` has to keep meaning "LLM calls", or the refusal-spends-nothing proof in judge mode stops proving anything. |
+| **Recordings re-encoded to 16 kHz mono WAV in the browser** | Sarvam's docs list WebM as accepted; the live API rejects it, and WebM/Opus is the only thing Chrome's `MediaRecorder` produces. The Web Audio API converts it client-side — no ffmpeg on the server, and a ~6x smaller upload since speech gains nothing from stereo at 48 kHz. |
+| **Vision model dispatched by name, not one fixed request shape** | A "parse" family model (`nemotron-parse`) takes no text prompt at all, selects transcription mode via a `tools` field, and returns a tool call instead of message content — nothing like a general vision-chat model. `_is_parse_model()` in `provider.py` routes to the matching request builder. |
+| **LaTeX tables flattened before indexing** | `nemotron-parse` renders every detected table as raw LaTeX (`\begin{tabular}...`). Left alone, that markup pollutes RAG chunks and gets read aloud verbatim by TTS; `flatten_latex_tables()` turns each row into a plain line. |
+| **OCR cache keyed on the vision model, not just image bytes** | Switching `NVIDIA_MODEL_VISION` must invalidate cached transcriptions — otherwise a page OCR'd by a since-replaced (or since-fixed) model keeps being served from disk forever, silently. |
 
 ### Asymmetric embeddings — the easiest thing to get wrong
 

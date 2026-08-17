@@ -15,6 +15,7 @@ _MULTI_NEWLINE = re.compile(r"\n{3,}")
 _MULTI_SPACE = re.compile(r"[ \t]{2,}")
 _PAGE_NUM_LINE = re.compile(r"^\s*[-–—|]?\s*\d{1,4}\s*[-–—|]?\s*$")
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+_LATEX_TABULAR = re.compile(r"\\begin\{tabular\}\{[^}]*\}(.*?)\\end\{tabular\}", re.DOTALL)
 
 
 def clean_text(text: str) -> str:
@@ -38,6 +39,31 @@ def clean_text(text: str) -> str:
     text = _MULTI_SPACE.sub(" ", text)
     text = _MULTI_NEWLINE.sub("\n\n", text)
     return text.strip()
+
+
+def flatten_latex_tables(text: str) -> str:
+    """Turn a nemotron-parse LaTeX table into plain lines.
+
+    That model renders every table it detects as raw LaTeX
+    (`\\begin{tabular}{cc}` ... `\\\\` row ends ... `\\end{tabular}`), which
+    would otherwise sit in RAG chunks as noise and get read aloud verbatim by
+    TTS. Cells become space-joined words on one line per row; nothing fancier
+    than that is worth building for a textbook-OCR pipeline.
+    """
+    if "\\begin{tabular}" not in text:
+        return text
+
+    def _flatten(match: re.Match) -> str:
+        rows = (r.strip() for r in match.group(1).split("\\\\"))
+        lines = []
+        for row in rows:
+            if not row:
+                continue
+            cells = [c.strip() for c in row.split("&")]
+            lines.append(" ".join(c for c in cells if c))
+        return "\n".join(lines)
+
+    return _LATEX_TABULAR.sub(_flatten, text)
 
 
 def strip_repeated_headers(pages: list[str], threshold: float = 0.6) -> list[str]:

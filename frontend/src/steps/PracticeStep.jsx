@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { api, isIndicScript } from '../api'
 import { Badge, Button, Card, ErrorNote, Reveal, Skeleton } from '../components/common'
 import { DifficultyShift } from '../components/DifficultyShift'
+import { MicButton, SpeakButton } from '../components/VoiceButton'
 
-export function PracticeStep({ doc, language, concept, difficulty }) {
+export function PracticeStep({ doc, language, concept, difficulty, voice }) {
   const [topic, setTopic] = useState(concept || '')
   const [set, setSet] = useState(null)
   const [answers, setAnswers] = useState({})
@@ -114,6 +115,7 @@ export function PracticeStep({ doc, language, concept, difficulty }) {
                   <p className={`flex-1 text-[15px] ${indic ? 'script-indic' : ''}`}>
                     {q.question}
                   </p>
+                  {voice && <SpeakButton text={q.question} language={language} label="" />}
                   {q.type === 'short_answer' && <Badge>written</Badge>}
                 </div>
 
@@ -145,15 +147,28 @@ export function PracticeStep({ doc, language, concept, difficulty }) {
                     })}
                   </div>
                 ) : (
-                  <textarea
-                    value={answers[q.id] ?? ''}
-                    disabled={!!graded}
-                    onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-                    rows={3}
-                    placeholder="Answer in your own words…"
-                    className="ml-8 w-[calc(100%-2rem)] resize-none rounded-xl border border-line
-                      bg-ink p-3 text-sm outline-none placeholder:text-muted focus:border-saffron"
-                  />
+                  <div className="ml-8 space-y-2">
+                    <textarea
+                      value={answers[q.id] ?? ''}
+                      disabled={!!graded}
+                      onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                      rows={3}
+                      placeholder="Answer in your own words…"
+                      className="w-full resize-none rounded-xl border border-line
+                        bg-ink p-3 text-sm outline-none placeholder:text-muted focus:border-saffron"
+                    />
+                    {voice && !graded && (
+                      <MicButton
+                        language={language}
+                        onText={(t) =>
+                          setAnswers((a) => ({
+                            ...a,
+                            [q.id]: a[q.id] ? `${a[q.id]} ${t}` : t,
+                          }))
+                        }
+                      />
+                    )}
+                  </div>
                 )}
 
                 {res && (

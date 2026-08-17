@@ -32,6 +32,16 @@ export const api = {
     return request('/upload', { method: 'POST', body: form })
   },
 
+  stt: ({ blob, language }) => {
+    const form = new FormData()
+    // Sarvam validates on the declared type, so the name must match the bytes.
+    const ext = (blob.type.split('/')[1] || 'wav').split(';')[0]
+    form.append('file', blob, `recording.${ext}`)
+    form.append('language', language)
+    return request('/stt', { method: 'POST', body: form })
+  },
+  tts: (body) => request('/tts', json(body)),
+
   ask: (body) => request('/ask', json(body)),
   teachBack: (body) => request('/teachback', json(body)),
   practice: (body) => request('/practice', json(body)),
@@ -51,3 +61,13 @@ export const LANGUAGES = [
 // Indic scripts need looser line height; Tanglish and English do not.
 export const isIndicScript = (lang) =>
   ['tamil', 'hindi', 'telugu', 'malayalam'].includes(lang)
+
+// Shown while recording, so the student knows which language to speak.
+export const SPEAK_PROMPT = {
+  tanglish: 'Speak in Tamil — it comes back in English letters',
+  tamil: 'Speak in Tamil',
+  english: 'Speak in English',
+  hindi: 'Speak in Hindi',
+  telugu: 'Speak in Telugu',
+  malayalam: 'Speak in Malayalam',
+}

@@ -1,17 +1,34 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { Button, Card, ErrorNote, Reveal, Spinner } from '../components/common'
+
+// A dense photo can take a vision model 10-15s+ to transcribe — a static
+// spinner over that long reads as "stuck", so the label changes with elapsed
+// time to keep confirming the request is still alive.
+function uploadStatus(seconds) {
+  if (seconds < 4) return 'Reading the page…'
+  if (seconds < 10) return 'Still reading — dense or busy pages take longer…'
+  return `Still working (${seconds}s) — a detailed photo can take up to 20s…`
+}
 
 export function UploadStep({ language, onReady }) {
   const [mode, setMode] = useState('file')
   const [file, setFile] = useState(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef(null)
 
   const canSubmit = mode === 'file' ? !!file : text.trim().length > 40
+
+  useEffect(() => {
+    if (!busy) return
+    setElapsed(0)
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000)
+    return () => clearInterval(id)
+  }, [busy])
 
   async function submit() {
     setBusy(true)
@@ -122,7 +139,7 @@ export function UploadStep({ language, onReady }) {
         <Button onClick={submit} disabled={!canSubmit || busy}>
           {busy ? 'Processing…' : 'Start learning'}
         </Button>
-        {busy && <Spinner label="Reading the page, then indexing it…" />}
+        {busy && <Spinner label={uploadStatus(elapsed)} />}
       </div>
     </Reveal>
   )

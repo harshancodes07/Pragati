@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api, isIndicScript } from '../api'
 import { Badge, Button, Card, ErrorNote, Reveal, Skeleton } from '../components/common'
 import { DifficultyShift } from '../components/DifficultyShift'
+import { MicButton, SpeakButton } from '../components/VoiceButton'
 
 const VERDICTS = {
   correct: { tone: 'good', label: 'Got it', icon: '✓' },
@@ -10,7 +11,14 @@ const VERDICTS = {
   incorrect: { tone: 'bad', label: 'Not quite', icon: '✕' },
 }
 
-export function TeachBackStep({ doc, language, concept, onEvaluated }) {
+export function TeachBackStep({
+  doc,
+  language,
+  concept,
+  voice,
+  autoSpeak,
+  onEvaluated,
+}) {
   const [topic, setTopic] = useState(concept || '')
   const [explanation, setExplanation] = useState('')
   const [result, setResult] = useState(null)
@@ -46,8 +54,8 @@ export function TeachBackStep({ doc, language, concept, onEvaluated }) {
       <header>
         <h2 className="text-2xl font-semibold">Teach it back</h2>
         <p className="mt-1 text-sm text-muted">
-          Explain the concept in your own words — any language, any grammar.
-          Bodhi grades the idea, never the wording.
+          Explain the concept in your own words{voice && ' — type it or just say it out loud'}.
+          Any language, any grammar. Bodhi grades the idea, never the wording.
         </p>
       </header>
 
@@ -67,7 +75,16 @@ export function TeachBackStep({ doc, language, concept, onEvaluated }) {
           className="w-full resize-none rounded-xl border border-line bg-ink p-4 text-sm
             outline-none placeholder:text-muted focus:border-saffron"
         />
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-3">
+          {voice ? (
+            <MicButton
+              language={language}
+              disabled={busy}
+              onText={(t) => setExplanation((e) => (e ? `${e} ${t}` : t))}
+            />
+          ) : (
+            <span />
+          )}
           <Button onClick={submit} disabled={busy || !topic.trim() || !explanation.trim()}>
             {busy ? 'Checking…' : 'Check my understanding'}
           </Button>
@@ -91,13 +108,22 @@ export function TeachBackStep({ doc, language, concept, onEvaluated }) {
             </div>
 
             {result.feedback && (
-              <p
-                className={`text-[15px] leading-relaxed ${
-                  isIndicScript(language) ? 'script-indic' : ''
-                }`}
-              >
-                {result.feedback}
-              </p>
+              <>
+                <p
+                  className={`text-[15px] leading-relaxed ${
+                    isIndicScript(language) ? 'script-indic' : ''
+                  }`}
+                >
+                  {result.feedback}
+                </p>
+                {voice && (
+                  <SpeakButton
+                    text={result.feedback}
+                    language={language}
+                    autoPlay={autoSpeak}
+                  />
+                )}
+              </>
             )}
 
             {result.correct_points?.length > 0 && (

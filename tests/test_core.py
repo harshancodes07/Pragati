@@ -12,10 +12,18 @@ import pytest
 
 from backend import adaptive
 from backend.ingest.chunk import chunk_pages
-from backend.ingest.clean import clean_text, is_meaningful, strip_repeated_headers
+from backend.ingest.clean import (
+    clean_text,
+    flatten_latex_tables,
+    is_meaningful,
+    strip_repeated_headers,
+)
 from backend.llm.json_utils import extract_json
+from backend.llm.provider import _is_parse_model
 from backend.llm.service import _normalise_practice, _normalise_teach_back, _resolve_option
 from backend.rag.store import NumpyVectorStore
+from backend.speech.langs import bcp47, needs_transliteration, stt_mode
+from backend.speech.text import TTS_CHAR_LIMIT, split_for_tts, strip_markup
 
 
 # ------------------------------------------------------------------ json
@@ -276,3 +284,171 @@ def test_short_answers_are_not_auto_graded():
 def test_mcq_grading_is_case_insensitive():
     questions = [{"id": "q0", "type": "mcq", "correct_answer": "Soil", "explanation": ""}]
     assert adaptive.grade_answers(questions, {"q0": "  soil "})["correct"] == 1
+
+
+# ------------------------------------------------------------------ voice
+
+
+@pytest.mark.parametrize(
+    "language,expected",
+    [
+        ("tanglish", "ta-IN"),   # rides the Tamil voice
+        ("tamil", "ta-IN"),
+        ("english", "en-IN"),
+        ("hindi", "hi-IN"),
+        ("telugu", "te-IN"),
+        ("malayalam", "ml-IN"),
+        ("klingon", "en-IN"),    # unknown ids must not crash a playback
+        ("", "en-IN"),
+    ],
+)
+def test_language_codes(language, expected):
+    assert bcp47(language) == expected
+
+
+def test_tanglish_is_the_only_special_case():
+    """Speech treats Tanglish differently on both sides; nothing else is."""
+    assert stt_mode("tanglish") == "translit"
+    assert needs_transliteration("tanglish") is True
+    for other in ("tamil", "english", "hindi", "telugu", "malayalam"):
+        assert stt_mode(other) == "transcribe"
+        assert needs_transliteration(other) is False
+
+
+def test_short_answer_is_one_clip():
+    assert split_for_tts("Photosynthesis-na enna? Solren.") == [
+        "Photosynthesis-na enna? Solren."
+    ]
+
+
+def test_empty_text_synthesises_nothing():
+    assert split_for_tts("") == []
+    assert split_for_tts("   \n  ") == []
+
+
+def test_long_answer_splits_on_sentence_boundaries():
+    """Every chunk must fit the vendor cap, and cuts must land between sentences."""
+    text = "Idhu oru romba periya sentence. " * 80
+    chunks = split_for_tts(text)
+
+    assert len(chunks) > 1
+    assert all(len(c) <= TTS_CHAR_LIMIT for c in chunks)
+    # A boundary split never orphans a fragment mid-sentence.
+    assert all(c.endswith(".") for c in chunks)
+
+
+def test_one_oversized_sentence_falls_back_to_a_hard_split():
+    """No sentence boundary to use — split anyway, but never mid-word."""
+    chunks = split_for_tts("word " * 600)
+
+    assert len(chunks) > 1
+    assert all(len(c) <= TTS_CHAR_LIMIT for c in chunks)
+    assert all(w == "word" for c in chunks for w in c.split())
+
+
+def test_markdown_is_not_read_aloud():
+    """'asterisk asterisk' spoken to a student is worse than useless."""
+    spoken = strip_markup("## Heading\n**bold** and `code` here\n- a bullet")
+
+    for junk in ("#", "*", "`", "-"):
+        assert junk not in spoken
+    assert "bold" in spoken and "code" in spoken and "a bullet" in spoken
+
+
+# ------------------------------------------------------------ vision resize
+
+
+def _png(width, height):
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (width, height), "white").save(buf, "PNG")
+    return buf.getvalue()
+
+
+def test_oversized_page_is_downscaled_for_the_vision_model():
+    """A phone photo is ~4000px; the hosted VLM 500s on those."""
+    import io
+
+    from PIL import Image
+
+    from backend.ingest.extract import _MAX_VISION_DIM, downscale_for_vision
+
+    out, mime = downscale_for_vision(_png(1977, 2560), "image/png")
+
+    assert mime == "image/jpeg"
+    assert max(Image.open(io.BytesIO(out)).size) <= _MAX_VISION_DIM
+
+
+def test_downscale_preserves_aspect_ratio():
+    import io
+
+    from PIL import Image
+
+    from backend.ingest.extract import downscale_for_vision
+
+    out, _ = downscale_for_vision(_png(2000, 1000), "image/png")
+    w, h = Image.open(io.BytesIO(out)).size
+    assert w == 2 * h
+
+
+def test_undecodable_bytes_pass_through_untouched():
+    """A resize failure must never be what blocks an upload."""
+    from backend.ingest.extract import downscale_for_vision
+
+    data = b"definitely not an image"
+    assert downscale_for_vision(data, "image/png") == (data, "image/png")
+
+
+def test_ocr_prompt_contains_no_worked_example():
+    """A concrete example in the OCR prompt gets parroted back as the whole answer.
+
+    Regression: 'e.g. [Diagram: cross-section of a leaf]' in the prompt made the
+    vision model return exactly that string instead of transcribing the page,
+    which then surfaced as a misleading 'try a clearer photo' error.
+    """
+    import inspect
+
+    from backend.llm.provider import NIMProvider
+
+    source = inspect.getsource(NIMProvider.ocr_image)
+    assert "e.g." not in source, "worked examples in the OCR prompt get parroted"
+    assert "cross-section of a leaf" not in source
+
+
+# --------------------------------------------------------- vision model shape
+
+
+def test_parse_model_detected_by_name():
+    assert _is_parse_model("nvidia/nemotron-parse")
+    assert _is_parse_model("nvidia/nemoretriever-parse")
+    assert not _is_parse_model("nvidia/llama-3.1-nemotron-nano-vl-8b-v1")
+    assert not _is_parse_model("nvidia/nemotron-nano-12b-v2-vl")
+
+
+def test_latex_table_becomes_plain_lines():
+    """nemotron-parse renders tables as LaTeX; that's noise for RAG chunks and
+    gibberish for TTS if it survives into the indexed text."""
+    raw = (
+        "Some heading text.\n\n"
+        "\\begin{tabular}{cc}\n"
+        "Question 0: What is X? & Answer 0 \\\\\n"
+        "Question 1: What is Y? & Answer 1 \\\\\n"
+        "\\end{tabular}\n\n"
+        "Trailing text."
+    )
+    out = flatten_latex_tables(raw)
+
+    assert "\\begin{tabular}" not in out
+    assert "\\end{tabular}" not in out
+    assert "&" not in out
+    assert "Question 0: What is X? Answer 0" in out
+    assert "Question 1: What is Y? Answer 1" in out
+    assert "Some heading text." in out and "Trailing text." in out
+
+
+def test_text_without_a_table_is_untouched():
+    plain = "Photosynthesis is a process. It happens in leaves."
+    assert flatten_latex_tables(plain) == plain

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { api, isIndicScript } from '../api'
 import { Button, Card, ErrorNote, Reveal, Skeleton } from '../components/common'
 import { GroundingCard } from '../components/GroundingCard'
+import { MicButton, SpeakButton } from '../components/VoiceButton'
 
-export function LearnStep({ doc, language, judgeMode, onTaught }) {
+export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught }) {
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -53,8 +54,16 @@ export function LearnStep({ doc, language, judgeMode, onTaught }) {
           className="w-full resize-none rounded-xl border border-line bg-ink p-4 text-sm
             outline-none placeholder:text-muted focus:border-saffron"
         />
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted">⌘/Ctrl + Enter to ask</span>
+        <div className="flex items-center justify-between gap-3">
+          {voice ? (
+            <MicButton
+              language={language}
+              disabled={busy}
+              onText={(t) => setQuestion((q) => (q ? `${q} ${t}` : t))}
+            />
+          ) : (
+            <span className="text-xs text-muted">⌘/Ctrl + Enter to ask</span>
+          )}
           <Button onClick={() => ask()} disabled={busy || !question.trim()}>
             {busy ? 'Thinking…' : 'Ask Bodhi'}
           </Button>
@@ -71,7 +80,7 @@ export function LearnStep({ doc, language, judgeMode, onTaught }) {
 
       {result && (
         <div className="space-y-4">
-          <Card>
+          <Card className="space-y-3">
             <p
               className={`whitespace-pre-wrap text-[15px] leading-relaxed ${
                 isIndicScript(language) ? 'script-indic' : ''
@@ -79,6 +88,15 @@ export function LearnStep({ doc, language, judgeMode, onTaught }) {
             >
               {result.answer}
             </p>
+            {voice && (
+              <div className="border-t border-line pt-3">
+                <SpeakButton
+                  text={result.answer}
+                  language={language}
+                  autoPlay={autoSpeak}
+                />
+              </div>
+            )}
           </Card>
 
           <GroundingCard

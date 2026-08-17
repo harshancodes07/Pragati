@@ -24,10 +24,21 @@ export default function App() {
   const [concept, setConcept] = useState('')
   const [difficulty, setDifficulty] = useState('medium')
   const [health, setHealth] = useState(null)
+  const [autoSpeak, setAutoSpeak] = useState(
+    () => localStorage.getItem('bodhi.autoSpeak') === '1',
+  )
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth({ status: 'down' }))
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem('bodhi.autoSpeak', autoSpeak ? '1' : '0')
+  }, [autoSpeak])
+
+  // No Sarvam key on the backend means no mic and no speaker anywhere — the app
+  // falls back to exactly what it was before voice existed.
+  const voice = !!health?.speech?.configured
 
   const unlocked = (id) => id === 'upload' || !!doc
 
@@ -87,6 +98,19 @@ export default function App() {
             {LANGUAGES.find((l) => l.id === language)?.hint}
           </p>
 
+          {voice && (
+            <button
+              onClick={() => setAutoSpeak((v) => !v)}
+              className={`mt-4 w-full rounded-lg border px-3 py-2 text-xs transition ${
+                autoSpeak
+                  ? 'border-saffron bg-saffron/10 text-saffron'
+                  : 'border-line text-muted hover:text-slate-200'
+              }`}
+            >
+              {autoSpeak ? '🔊 Read answers aloud' : '🔇 Read answers aloud'}
+            </button>
+          )}
+
           <button
             onClick={() => setJudgeMode((v) => !v)}
             className={`mt-4 w-full rounded-lg border px-3 py-2 text-xs transition ${
@@ -112,6 +136,19 @@ export default function App() {
                 {health.nim.model}
               </div>
             )}
+            <div className="mt-1.5">
+              <span
+                className={`mr-1.5 inline-block h-2 w-2 rounded-full ${
+                  voice ? 'bg-leaf' : 'bg-line'
+                }`}
+              />
+              Voice {voice ? 'ready' : 'off'}
+              {judgeMode && voice && health.speech?.detail && (
+                <div className="mt-1 font-mono text-[10px] leading-tight">
+                  {health.speech.detail}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </aside>
@@ -119,12 +156,19 @@ export default function App() {
       {/* Content column */}
       <main className="min-w-0 flex-1">
         {doc && (
-          <div className="mb-6 flex items-center gap-3 text-sm text-muted">
+          <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted">
             <Badge tone="brand">{doc.title}</Badge>
             <span>
               {doc.pages} page{doc.pages === 1 ? '' : 's'} · {doc.chunk_count} chunks
               {doc.ocr_pages > 0 && ` · ${doc.ocr_pages} OCR'd`}
             </span>
+            {judgeMode && doc.timing_ms && (
+              <span className="font-mono text-[10px] leading-tight text-line">
+                {Object.entries(doc.timing_ms)
+                  .map(([stage, ms]) => `${stage}=${ms}ms`)
+                  .join(' · ')}
+              </span>
+            )}
           </div>
         )}
 
@@ -146,6 +190,8 @@ export default function App() {
               doc={doc}
               language={language}
               judgeMode={judgeMode}
+              voice={voice}
+              autoSpeak={autoSpeak}
               onTaught={setConcept}
             />
           )}
@@ -156,6 +202,8 @@ export default function App() {
               doc={doc}
               language={language}
               concept={concept}
+              voice={voice}
+              autoSpeak={autoSpeak}
               onEvaluated={(res) => setDifficulty(res.difficulty.current)}
             />
           )}
@@ -167,6 +215,7 @@ export default function App() {
               language={language}
               concept={concept}
               difficulty={difficulty}
+              voice={voice}
             />
           )}
 

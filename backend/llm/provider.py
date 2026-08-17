@@ -8,6 +8,7 @@ Also the single point where we count calls, tokens and latency for judge mode.
 from __future__ import annotations
 
 import base64
+import json
 import re
 import threading
 import time
@@ -18,6 +19,7 @@ import httpx
 from openai import OpenAI
 
 from backend.config import settings
+from backend.ingest.clean import flatten_latex_tables
 
 
 @dataclass
@@ -76,6 +78,28 @@ _THINK_BLOCK = re.compile(r"<(think|thinking|reasoning)>.*?</\1>", re.DOTALL | r
 _ORPHAN_OPEN = re.compile(r"<(think|thinking|reasoning)>.*\Z", re.DOTALL | re.IGNORECASE)
 
 
+# Carries no worked example on purpose. A sample output line in this prompt gets
+# parroted back as the entire answer instead of the page's text — the same trap
+# the language prompts avoid by stating rules rather than showing samples.
+# Guarded by test_ocr_prompt_contains_no_worked_example.
+_OCR_PROMPT = (
+    "Transcribe ALL text from this textbook page exactly as printed. Preserve "
+    "headings, paragraph breaks, lists and numbering. Transcribe every question "
+    "and every option. If the page contains a diagram, summarise it in one line "
+    "wrapped in square brackets and prefixed 'Diagram:', then continue "
+    "transcribing. Output only the transcription — no commentary, no preamble."
+)
+
+# Document-parsing models take an entirely different request shape (no text
+# prompt, a `tools` selector, a tool-call response) than a general vision-chat
+# model. Matched by name since NIM's model listing has no capability flag.
+_PARSE_MODEL_MARKERS = ("nemotron-parse", "nemoretriever-parse")
+
+
+def _is_parse_model(model: str) -> bool:
+    return any(marker in model for marker in _PARSE_MODEL_MARKERS)
+
+
 def _is_bad_request(exc: Exception) -> bool:
     """True when the server rejected the request shape (not a transient fault)."""
     status = getattr(exc, "status_code", None) or getattr(
@@ -122,7 +146,7 @@ class NIMProvider:
     # ------------------------------------------------------------ completions
 
     def _create(self, model: str, messages, temperature: float, max_tokens: int,
-                stream: bool = False):
+                stream: bool = False, timeout: float | None = None):
         """Create a completion with thinking disabled.
 
         Not every model accepts `chat_template_kwargs`, so a rejection falls
@@ -130,6 +154,8 @@ class NIMProvider:
         """
         kwargs = dict(model=model, messages=messages, temperature=temperature,
                       max_tokens=max_tokens, stream=stream)
+        if timeout is not None:
+            kwargs["timeout"] = timeout
         if self._supports_no_think.get(model, True):
             try:
                 return self._client.chat.completions.create(
@@ -152,21 +178,34 @@ class NIMProvider:
         model: str | None = None,
         temperature: float = 0.3,
         max_tokens: int = 1200,
+        allow_backup: bool = True,
+        timeout: float | None = None,
     ) -> str:
-        """Single completion. Falls back to the backup model on failure."""
+        """Single completion. Falls back to the backup model on failure.
+
+        `allow_backup=False` for calls the backup model physically cannot serve —
+        sending an image to a text-only model doesn't just fail, it fails with a
+        confusing error that then masks whatever went wrong on the real attempt.
+        """
         primary = model or settings.nvidia_model
         if not primary:
             raise NIMError("No NVIDIA_MODEL configured. Run scripts/benchmark_nim.py.")
 
         attempts = [primary]
-        if settings.nvidia_model_backup and settings.nvidia_model_backup != primary:
+        if (
+            allow_backup
+            and settings.nvidia_model_backup
+            and settings.nvidia_model_backup != primary
+        ):
             attempts.append(settings.nvidia_model_backup)
 
         last_error: Exception | None = None
         for candidate in attempts:
             started = time.perf_counter()
             try:
-                resp = self._create(candidate, messages, temperature, max_tokens)
+                resp = self._create(
+                    candidate, messages, temperature, max_tokens, timeout=timeout
+                )
             except Exception as exc:  # noqa: BLE001 — any failure means try backup
                 stats.record_failure()
                 last_error = exc
@@ -266,22 +305,28 @@ class NIMProvider:
     # ----------------------------------------------------------------- vision
 
     def ocr_image(self, image_bytes: bytes, mime: str = "image/png") -> str:
-        """Read a textbook page photo with a NIM vision model."""
+        """Read a textbook page photo with a NIM vision model.
+
+        Two unrelated request shapes live behind this one method. A "parse"
+        family model (nemotron-parse, nemoretriever-parse) takes no text prompt
+        at all and returns structured blocks via a tool call; a general
+        vision-chat model takes the usual text+image message and free-form
+        content. Which one `settings.vision_model` names decides the path —
+        detected by name, since NIM's /models listing carries no capability
+        flag to check instead.
+        """
+        model = settings.vision_model
+        if _is_parse_model(model):
+            return self._ocr_via_parse(image_bytes, mime, model)
+        return self._ocr_via_chat(image_bytes, mime, model)
+
+    def _ocr_via_chat(self, image_bytes: bytes, mime: str, model: str) -> str:
         b64 = base64.b64encode(image_bytes).decode()
         messages = [
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Transcribe ALL text from this textbook page exactly as "
-                            "printed. Preserve headings, paragraph breaks, lists and "
-                            "numbering. Describe any diagram in one bracketed line, "
-                            "e.g. [Diagram: cross-section of a leaf]. Output only the "
-                            "transcription — no commentary, no preamble."
-                        ),
-                    },
+                    {"type": "text", "text": _OCR_PROMPT},
                     {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
                 ],
             }
@@ -289,10 +334,70 @@ class NIMProvider:
         return self.chat(
             messages,
             task="ocr",
-            model=settings.vision_model,
+            model=model,
             temperature=0.0,
             max_tokens=2500,
+            # The backup is a text-only model; retrying an image on it is
+            # guaranteed to 400 and would bury the real failure.
+            allow_backup=False,
+            # A dense textbook page measured ~100s to transcribe on the working
+            # chat-vision model — the 90s client default cut that off.
+            timeout=240.0,
         )
+
+    def _ocr_via_parse(self, image_bytes: bytes, mime: str, model: str) -> str:
+        """Nemotron-Parse's actual wire contract — confirmed against the live
+        endpoint, not just the docs, because the two disagree on response shape.
+
+        No text prompt: the message carries only the image. The transcription
+        mode is chosen via `tools`, not a prompt instruction, and the result
+        comes back as a *tool call* rather than message content — `arguments`
+        is a JSON-encoded string that decodes to a list of blocks, each with a
+        `text` field (`markdown_bbox` mode nests one extra list level for the
+        bounding boxes we don't need here).
+        """
+        b64 = base64.b64encode(image_bytes).decode()
+        body = {
+            "model": model,
+            "temperature": 0.0,
+            "tools": [{"type": "function", "function": {"name": "markdown_no_bbox"}}],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                    ],
+                }
+            ],
+        }
+
+        started = time.perf_counter()
+        try:
+            resp = httpx.post(
+                f"{settings.nvidia_base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {settings.nvidia_api_key}"},
+                json=body,
+                timeout=90.0,
+            )
+        except httpx.HTTPError as exc:
+            stats.record_failure()
+            raise NIMError(f"NIM call failed for task 'ocr': {exc}") from exc
+
+        if resp.status_code >= 400:
+            stats.record_failure()
+            raise NIMError(f"NIM call failed for task 'ocr': {resp.status_code} - {resp.text[:300]}")
+
+        payload = resp.json()
+        stats.record("ocr", (time.perf_counter() - started) * 1000, payload.get("usage"))
+
+        try:
+            call = payload["choices"][0]["message"]["tool_calls"][0]
+            blocks = json.loads(call["function"]["arguments"])
+            text = "\n\n".join(b["text"] for b in blocks if b.get("text"))
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            raise NIMError(f"Unexpected nemotron-parse response shape: {exc}") from exc
+
+        return flatten_latex_tables(text)
 
 
 _provider: NIMProvider | None = None
