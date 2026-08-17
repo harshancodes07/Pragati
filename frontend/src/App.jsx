@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { LANGUAGES, api } from './api'
 import { Badge, Card } from './components/common'
+import { LanguageModal } from './components/LanguageModal'
 import { UploadStep } from './steps/UploadStep'
 import { LearnStep } from './steps/LearnStep'
 import { TeachBackStep } from './steps/TeachBackStep'
@@ -19,6 +20,8 @@ const STEPS = [
 export default function App() {
   const [step, setStep] = useState('upload')
   const [language, setLanguage] = useState('tanglish')
+  const [languageChosen, setLanguageChosen] = useState(false)
+  const [languageModalOpen, setLanguageModalOpen] = useState(false)
   const [judgeMode, setJudgeMode] = useState(false)
   const [doc, setDoc] = useState(null)
   const [concept, setConcept] = useState('')
@@ -82,21 +85,21 @@ export default function App() {
           <label className="block text-xs font-semibold uppercase tracking-wide text-muted">
             Language
           </label>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none
-              focus:border-saffron"
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-muted">
-            {LANGUAGES.find((l) => l.id === language)?.hint}
-          </p>
+          {languageChosen ? (
+            <button
+              onClick={() => setLanguageModalOpen(true)}
+              className="flex w-full items-center justify-between rounded-lg border border-line
+                bg-surface px-3 py-2 text-sm transition hover:border-saffron"
+            >
+              <span>
+                {LANGUAGES.find((l) => l.id === language)?.flag}{' '}
+                {LANGUAGES.find((l) => l.id === language)?.label}
+              </span>
+              <span className="text-xs text-saffron">Change</span>
+            </button>
+          ) : (
+            <p className="text-xs text-muted">Chosen right after you upload.</p>
+          )}
 
           {voice && (
             <button
@@ -181,6 +184,7 @@ export default function App() {
               onReady={(res) => {
                 setDoc(res)
                 setStep('learn')
+                setLanguageModalOpen(true)
               }}
             />
           )}
@@ -231,6 +235,18 @@ export default function App() {
           </Card>
         )}
       </main>
+
+      <LanguageModal
+        open={languageModalOpen}
+        current={language}
+        dismissible={languageChosen}
+        onSelect={(id) => {
+          setLanguage(id)
+          setLanguageChosen(true)
+          setLanguageModalOpen(false)
+        }}
+        onClose={() => setLanguageModalOpen(false)}
+      />
     </div>
   )
 }

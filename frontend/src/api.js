@@ -50,12 +50,12 @@ export const api = {
 }
 
 export const LANGUAGES = [
-  { id: 'tanglish', label: 'Tanglish', hint: 'Tamil in English letters' },
-  { id: 'tamil', label: 'தமிழ்', hint: 'Tamil script' },
-  { id: 'english', label: 'English', hint: 'Simple English' },
-  { id: 'hindi', label: 'हिन्दी', hint: 'Hindi' },
-  { id: 'telugu', label: 'తెలుగు', hint: 'Telugu' },
-  { id: 'malayalam', label: 'മലയാളം', hint: 'Malayalam' },
+  { id: 'tanglish', label: 'Tanglish', hint: 'Tamil in English letters', flag: '🔤' },
+  { id: 'tamil', label: 'தமிழ்', hint: 'Tamil script', flag: '🇮🇳' },
+  { id: 'english', label: 'English', hint: 'Simple English', flag: '🇬🇧' },
+  { id: 'hindi', label: 'हिन्दी', hint: 'Hindi', flag: '🇮🇳' },
+  { id: 'telugu', label: 'తెలుగు', hint: 'Telugu', flag: '🇮🇳' },
+  { id: 'malayalam', label: 'മലയാളം', hint: 'Malayalam', flag: '🇮🇳' },
 ]
 
 // Indic scripts need looser line height; Tanglish and English do not.
