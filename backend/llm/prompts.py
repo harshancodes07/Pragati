@@ -106,9 +106,80 @@ HOW TO TEACH:
 
 # --------------------------------------------------------- 2. teach-back eval
 
+# The student picks who they are explaining to. That choice changes what a good
+# answer even looks like, so it changes the rubric — not just the wording of the
+# feedback. Rules, never sample answers, for the same reason as the language
+# registers above.
+TEACH_BACK_MODES: dict[str, dict[str, str]] = {
+    "simple": {
+        "label": "Simple",
+        "goal": "explain it to a 10-year-old",
+        "rubric": """MODE: SIMPLE — the student is explaining to a 10-year-old.
+
+Judge against that audience:
+- Did they grasp the core idea, stripped of jargon?
+- Is the language genuinely simple enough for a child — short sentences, everyday words?
+- Would a 10-year-old actually come away understanding it?
+- Any technical term left unexplained counts against clarity, not concept.
+
+Do NOT reward textbook phrasing here. A precise-but-incomprehensible answer scores
+LOW on clarity even when the concept is right. Completeness means "the parts a
+child needs", not "every part the textbook lists".""",
+    },
+    "exam": {
+        "label": "Exam",
+        "goal": "explain it as a 5-mark answer",
+        "rubric": """MODE: EXAM — the student is writing a 5-mark exam answer.
+
+Judge against that audience:
+- Is the definition correct and stated clearly?
+- Are the key points an examiner expects present?
+- Is the answer logically structured, not a single rambling sentence?
+- Where the concept calls for a formula, example or labelled step, is it there?
+
+This is the one mode where completeness carries real weight. Still never penalise
+informal wording, spelling or code-mixing — an examiner marks the content, and so
+do you. Score as a fair but not generous examiner would.""",
+    },
+    "friend": {
+        "label": "Friend",
+        "goal": "explain it to a beginner friend",
+        "rubric": """MODE: FRIEND — the student is explaining to a beginner friend.
+
+Judge against that audience:
+- Is the concept itself correct?
+- Does it read like a person talking, not a definition being recited?
+- Are unfamiliar terms explained in passing rather than assumed?
+- Is there an example or analogy that makes it click?
+- Would a beginner genuinely be helped by this?
+
+A stiff textbook recital scores LOW here even if factually perfect. Natural,
+useful explanation is the point of this mode.""",
+    },
+}
+
+DEFAULT_TEACH_BACK_MODE = "simple"
+
+
+def teach_back_mode_rubric(mode: str) -> str:
+    entry = TEACH_BACK_MODES.get(
+        (mode or "").lower().strip(), TEACH_BACK_MODES[DEFAULT_TEACH_BACK_MODE]
+    )
+    return entry["rubric"]
+
+
 TEACH_BACK_SCHEMA = """{
   "understanding": "correct" | "partial" | "misconception" | "incorrect",
+  "scores": {
+    "overall": 0-100,
+    "concept": 0-100,
+    "clarity": 0-100,
+    "completeness": 0-100,
+    "examples": 0-100
+  },
   "correct_points": ["what the student genuinely got right"],
+  "did_well": ["2-4 specific things they did well, addressed to the student"],
+  "improve": ["2-4 specific, actionable things to fix next time"],
   "misconceptions": [
     {
       "student_claim": "the specific thing they said that is wrong",
@@ -117,19 +188,39 @@ TEACH_BACK_SCHEMA = """{
     }
   ],
   "feedback": "warm, direct feedback addressed to the student in their language",
+  "improved_explanation": "a better version of THEIR explanation, in their language — empty string if theirs was already good",
   "next_action": "reteach" | "reinforce" | "advance"
 }"""
 
 
-def teach_back_system_prompt(language: str) -> str:
+def teach_back_system_prompt(language: str, mode: str = DEFAULT_TEACH_BACK_MODE) -> str:
     return f"""You evaluate whether a student truly understands a concept they just tried to
 explain back in their own words.
 
 {language_rules(language)}
-Write ONLY the "feedback" field in that language. All other fields are in English
-for the application to process.
+Write ONLY the "feedback", "improved_explanation", "did_well" and "improve"
+fields in that language. All other fields are in English for the application
+to process.
 
 {_INJECTION_RULE}
+
+{teach_back_mode_rubric(mode)}
+
+SCORING (0-100 each):
+- "concept"      — is the underlying idea right? This is the heaviest signal.
+- "clarity"      — is it understandable *to this mode's audience*?
+- "completeness" — are the pieces that matter for this mode present?
+- "examples"     — is there an example, analogy or concrete illustration that helps?
+- "overall"      — your holistic judgement. Roughly track the four above, but you
+                   may weight them for the mode; a real misconception should pull
+                   it down hard regardless of how well-written the answer is.
+
+Score honestly — inflated praise teaches nothing — but grade a genuine, engaged
+attempt generously. A student who understands the idea and says so in their own
+casual words is doing exactly what was asked and should score well.
+
+You are a tutor reading a student's thinking, not an automated checker matching
+strings. "did_well" and "improve" must point at things they actually wrote.
 
 GRADE CONCEPTS, NOT LANGUAGE — this rule overrides your instincts:
 Students answer in informal Tanglish, mixed Tamil-English, or broken grammar.

@@ -159,6 +159,7 @@ export default function App() {
           <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted">
             <Badge tone="brand">{doc.title}</Badge>
             <span>
+              {doc.file_count > 1 && `${doc.file_count} files · `}
               {doc.pages} page{doc.pages === 1 ? '' : 's'} · {doc.chunk_count} chunks
               {doc.ocr_pages > 0 && ` · ${doc.ocr_pages} OCR'd`}
             </span>

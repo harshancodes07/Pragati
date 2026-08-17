@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api, isIndicScript } from '../api'
 import { Badge, Button, Card, ErrorNote, Reveal, Skeleton } from '../components/common'
 import { DifficultyShift } from '../components/DifficultyShift'
+import { ScoreDashboard } from '../components/ScoreDashboard'
 import { MicButton, SpeakButton } from '../components/VoiceButton'
 
 const VERDICTS = {
@@ -10,6 +11,33 @@ const VERDICTS = {
   misconception: { tone: 'bad', label: 'Misconception found', icon: '!' },
   incorrect: { tone: 'bad', label: 'Not quite', icon: '✕' },
 }
+
+// Who the student is explaining to. This changes the grading rubric on the
+// backend, not just the placeholder text — a stiff textbook recital scores
+// well in Exam mode and badly in Friend mode, by design.
+const MODES = [
+  {
+    id: 'simple',
+    dot: '🟢',
+    label: 'Simple',
+    tagline: 'Explain it to a 10-year-old',
+    placeholder: 'Say it like you would to your younger sibling…',
+  },
+  {
+    id: 'exam',
+    dot: '🔵',
+    label: 'Exam',
+    tagline: 'Explain it as a 5-mark answer',
+    placeholder: 'Write it the way you would in the exam hall…',
+  },
+  {
+    id: 'friend',
+    dot: '🟣',
+    label: 'Friend',
+    tagline: 'Explain it to a beginner',
+    placeholder: 'Explain it to a friend who has never heard of this…',
+  },
+]
 
 export function TeachBackStep({
   doc,
@@ -20,10 +48,13 @@ export function TeachBackStep({
   onEvaluated,
 }) {
   const [topic, setTopic] = useState(concept || '')
+  const [mode, setMode] = useState('simple')
   const [explanation, setExplanation] = useState('')
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+
+  const activeMode = MODES.find((m) => m.id === mode) ?? MODES[0]
 
   async function submit() {
     if (!topic.trim() || !explanation.trim()) return
@@ -37,6 +68,7 @@ export function TeachBackStep({
         concept: topic,
         explanation,
         language,
+        mode,
       })
       setResult(res)
       onEvaluated(res)
@@ -48,6 +80,7 @@ export function TeachBackStep({
   }
 
   const verdict = result && (VERDICTS[result.understanding] ?? VERDICTS.partial)
+  const indic = isIndicScript(language)
 
   return (
     <Reveal className="space-y-5">
@@ -58,6 +91,33 @@ export function TeachBackStep({
           Any language, any grammar. Bodhi grades the idea, never the wording.
         </p>
       </header>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        {MODES.map((m) => {
+          const active = m.id === mode
+          return (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id)}
+              className={`rounded-xl border px-4 py-3 text-left transition ${
+                active
+                  ? 'border-saffron bg-saffron/10'
+                  : 'border-line hover:border-muted hover:bg-raised/50'
+              }`}
+            >
+              <div
+                className={`flex items-center gap-2 text-sm font-medium ${
+                  active ? 'text-saffron' : 'text-slate-200'
+                }`}
+              >
+                <span>{m.dot}</span>
+                {m.label}
+              </div>
+              <div className="mt-0.5 text-xs text-muted">{m.tagline}</div>
+            </button>
+          )
+        })}
+      </div>
 
       <Card className="space-y-3">
         <input
@@ -71,7 +131,7 @@ export function TeachBackStep({
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
           rows={5}
-          placeholder="Plant sunlight ah use panni food make pannum…"
+          placeholder={activeMode.placeholder}
           className="w-full resize-none rounded-xl border border-line bg-ink p-4 text-sm
             outline-none placeholder:text-muted focus:border-saffron"
         />
@@ -101,6 +161,15 @@ export function TeachBackStep({
 
       {result && (
         <Reveal className="space-y-4">
+          {result.scores && (
+            <ScoreDashboard
+              scores={result.scores}
+              marks={result.mode === 'exam' ? result.marks_out_of_5 : null}
+              misconceptions={result.misconceptions}
+              indic={indic}
+            />
+          )}
+
           <Card className="space-y-4">
             <div className="flex items-center gap-3">
               <span className="text-xl">{verdict.icon}</span>
@@ -109,11 +178,7 @@ export function TeachBackStep({
 
             {result.feedback && (
               <>
-                <p
-                  className={`text-[15px] leading-relaxed ${
-                    isIndicScript(language) ? 'script-indic' : ''
-                  }`}
-                >
+                <p className={`text-[15px] leading-relaxed ${indic ? 'script-indic' : ''}`}>
                   {result.feedback}
                 </p>
                 {voice && (
@@ -125,22 +190,49 @@ export function TeachBackStep({
                 )}
               </>
             )}
+          </Card>
 
-            {result.correct_points?.length > 0 && (
-              <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-leaf">
-                  What you got right
+          <div className="grid gap-4 sm:grid-cols-2">
+            {result.did_well?.length > 0 && (
+              <Card>
+                <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-leaf">
+                  You got this right
                 </h4>
-                <ul className="space-y-1.5">
-                  {result.correct_points.map((p, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-slate-300">
-                      <span className="text-leaf">✓</span> {p}
+                <ul className="space-y-2">
+                  {result.did_well.map((p, i) => (
+                    <li
+                      key={i}
+                      className={`flex gap-2 text-sm text-slate-300 ${
+                        indic ? 'script-indic' : ''
+                      }`}
+                    >
+                      <span className="shrink-0 text-leaf">✓</span> {p}
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Card>
             )}
-          </Card>
+
+            {result.improve?.length > 0 && (
+              <Card>
+                <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-saffron">
+                  Improve this
+                </h4>
+                <ul className="space-y-2">
+                  {result.improve.map((p, i) => (
+                    <li
+                      key={i}
+                      className={`flex gap-2 text-sm text-slate-300 ${
+                        indic ? 'script-indic' : ''
+                      }`}
+                    >
+                      <span className="shrink-0 text-saffron">→</span> {p}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+          </div>
 
           {result.misconceptions?.length > 0 && (
             <Card className="border-alert/40 bg-alert/5">
@@ -170,6 +262,24 @@ export function TeachBackStep({
                   </div>
                 ))}
               </div>
+            </Card>
+          )}
+
+          {result.improved_explanation && (
+            <Card className="space-y-3 border-saffron/30 bg-saffron/5">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-saffron">
+                One way to say it better
+              </h4>
+              <p
+                className={`text-[15px] leading-relaxed text-slate-300 ${
+                  indic ? 'script-indic' : ''
+                }`}
+              >
+                {result.improved_explanation}
+              </p>
+              {voice && (
+                <SpeakButton text={result.improved_explanation} language={language} />
+              )}
             </Card>
           )}
 

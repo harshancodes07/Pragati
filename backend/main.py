@@ -5,6 +5,7 @@ Every NIM call happens here or below. The frontend never sees the API key.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from typing import Any
@@ -18,7 +19,7 @@ from backend import adaptive, db
 from backend.config import settings
 from backend.ingest.chunk import chunk_pages
 from backend.ingest.extract import ExtractionError, extract
-from backend.llm import service
+from backend.llm import prompts, service
 from backend.llm.provider import NIMError, get_provider, stats
 from backend.rag.embeddings import embed_passages
 from backend.rag.retrieve import out_of_scope_message, retrieve
@@ -66,6 +67,7 @@ class TeachBackRequest(BaseModel):
     concept: str = Field(min_length=1, max_length=500)
     explanation: str = Field(min_length=1, max_length=4000)
     language: str = "tanglish"
+    mode: str = "simple"  # simple | exam | friend — changes the rubric, not just the tone
 
 
 class PracticeRequest(BaseModel):
@@ -131,9 +133,33 @@ def health() -> dict[str, Any]:
 
 # -------------------------------------------------------------------- upload
 
+# A hard cap keeps a mis-click from turning into a multi-minute OCR bill; the
+# bounded concurrency below keeps a legitimate batch from hammering NIM with
+# every page's vision call at once.
+_MAX_UPLOAD_FILES = 8
+_MAX_CONCURRENT_EXTRACTIONS = 3
+
+
+async def _extract_one(f: UploadFile, semaphore: asyncio.Semaphore) -> tuple[list[str], dict[str, Any]]:
+    data = await f.read()
+    if not data:
+        raise HTTPException(400, f"'{f.filename}' is empty.")
+
+    async with semaphore:
+        try:
+            # extract() makes blocking network calls (OCR); to_thread keeps
+            # the event loop free so other files' extractions can proceed
+            # concurrently instead of queueing behind this one.
+            return await asyncio.to_thread(extract, data=data, filename=f.filename or "")
+        except ExtractionError as exc:
+            raise HTTPException(400, f"'{f.filename}': {exc}") from exc
+        except NIMError as exc:
+            raise HTTPException(503, f"Couldn't process '{f.filename}': {exc}") from exc
+
+
 @app.post("/api/upload")
 async def upload(
-    file: UploadFile | None = File(default=None),
+    files: list[UploadFile] | None = File(default=None),
     text: str | None = Form(default=None),
     title: str | None = Form(default=None),
     language: str = Form(default="tanglish"),
@@ -144,26 +170,46 @@ async def upload(
     timing_ms: dict[str, float] = {}
     started = time.perf_counter()
 
-    try:
-        if file is not None:
-            data = await file.read()
-            if not data:
-                raise HTTPException(400, "That file is empty.")
-            timing_ms["read_upload"] = _elapsed_ms(started)
+    uploaded = [f for f in (files or []) if f.filename]
+    if len(uploaded) > _MAX_UPLOAD_FILES:
+        raise HTTPException(400, f"Upload at most {_MAX_UPLOAD_FILES} files at once.")
 
-            t = time.perf_counter()
-            pages, meta = extract(data=data, filename=file.filename or "")
-            timing_ms["extract"] = _elapsed_ms(t)
-            doc_title = title or file.filename or "Untitled"
-        else:
+    if uploaded:
+        t = time.perf_counter()
+        semaphore = asyncio.Semaphore(_MAX_CONCURRENT_EXTRACTIONS)
+        results = await asyncio.gather(*(_extract_one(f, semaphore) for f in uploaded))
+        timing_ms["extract"] = _elapsed_ms(t)
+
+        # Multiple files become one logical document — a flat, continuous page
+        # list. Nothing downstream (chunking, retrieval, citations) needs to
+        # know a page boundary was also a file boundary.
+        pages: list[str] = []
+        sources: list[str] = []
+        ocr_pages_total = 0
+        cached_all = True
+        for file_pages, file_meta in results:
+            pages.extend(file_pages)
+            sources.append(file_meta.get("source", "unknown"))
+            ocr_pages_total += file_meta.get("ocr_pages", 0)
+            cached_all = cached_all and file_meta.get("cached", False)
+        meta = {
+            "source": "+".join(dict.fromkeys(sources)),
+            "ocr_pages": ocr_pages_total,
+            "cached": cached_all,
+        }
+
+        names = [f.filename or "Untitled" for f in uploaded]
+        doc_title = title or (
+            names[0] if len(names) == 1 else f"{names[0]} + {len(names) - 1} more"
+        )
+    else:
+        try:
             t = time.perf_counter()
             pages, meta = extract(text=text or "")
             timing_ms["extract"] = _elapsed_ms(t)
-            doc_title = title or "Pasted text"
-    except ExtractionError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except NIMError as exc:
-        raise HTTPException(503, f"Couldn't process that upload: {exc}") from exc
+        except ExtractionError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        doc_title = title or "Pasted text"
 
     t = time.perf_counter()
     doc_id = db.create_document(doc_title, meta.get("source", "unknown"), len(pages), 0)
@@ -202,6 +248,7 @@ async def upload(
         "cached": meta.get("cached", False),
         "preview": chunks[0]["text"][:400],
         "timing_ms": {k: round(v) for k, v in timing_ms.items()},
+        "file_count": len(uploaded) or (1 if text and text.strip() else 0),
     }
 
 
@@ -336,9 +383,11 @@ def teach_back(req: TeachBackRequest) -> dict[str, Any]:
         threshold=0.0,  # we grade against best-available evidence, never refuse here
     )
 
+    mode = req.mode if req.mode in prompts.TEACH_BACK_MODES else "simple"
+
     try:
         evaluation = service.evaluate_teach_back(
-            req.concept, req.explanation, result.chunks, req.language
+            req.concept, req.explanation, result.chunks, req.language, mode
         )
     except NIMError as exc:
         raise HTTPException(503, "Couldn't evaluate that answer. Try again.") from exc
@@ -352,6 +401,11 @@ def teach_back(req: TeachBackRequest) -> dict[str, Any]:
 
     payload = {
         **evaluation,
+        "mode": mode,
+        # Derived, not asked of the model: a 5-mark equivalent has to agree with
+        # the overall score the student is looking at, and arithmetic guarantees
+        # that where a second model judgement would not.
+        "marks_out_of_5": round(evaluation["scores"]["overall"] / 20, 1),
         "sources": result.to_sources(2),
         "difficulty": {
             "previous": current, "current": new_difficulty,

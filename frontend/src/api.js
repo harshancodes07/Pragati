@@ -23,9 +23,9 @@ export const api = {
   health: () => request('/health'),
   stats: () => request('/stats'),
 
-  upload: ({ file, text, title, language }) => {
+  upload: ({ files, text, title, language }) => {
     const form = new FormData()
-    if (file) form.append('file', file)
+    if (files?.length) files.forEach((f) => form.append('files', f))
     if (text) form.append('text', text)
     if (title) form.append('title', title)
     form.append('language', language)

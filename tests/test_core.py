@@ -20,7 +20,12 @@ from backend.ingest.clean import (
 )
 from backend.llm.json_utils import extract_json
 from backend.llm.provider import _is_parse_model
-from backend.llm.service import _normalise_practice, _normalise_teach_back, _resolve_option
+from backend.llm.service import (
+    _clamp_score,
+    _normalise_practice,
+    _normalise_teach_back,
+    _resolve_option,
+)
 from backend.rag.store import NumpyVectorStore
 from backend.speech.langs import bcp47, needs_transliteration, stt_mode
 from backend.speech.text import TTS_CHAR_LIMIT, split_for_tts, strip_markup
@@ -452,3 +457,68 @@ def test_latex_table_becomes_plain_lines():
 def test_text_without_a_table_is_untouched():
     plain = "Photosynthesis is a process. It happens in leaves."
     assert flatten_latex_tables(plain) == plain
+
+
+# ------------------------------------------------------- teach-back scoring
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        (82, 82),
+        ("82", 82),
+        ("82/100", 82),      # models love writing the denominator
+        ("85%", 85),
+        (0.85, 85),          # a 0-1 float meant a percentage
+        (140, 100),          # clamped, not trusted
+        (-5, 0),
+        (None, 50),          # falls back
+        ("banana", 50),
+    ],
+)
+def test_clamp_score_tolerates_model_formats(raw, expected):
+    assert _clamp_score(raw, 50) == expected
+
+
+def test_scores_survive_a_model_that_omits_them():
+    """A label-only response must still render a coherent dashboard."""
+    out = _normalise_teach_back({"understanding": "correct"})
+    assert set(out["scores"]) == {"overall", "concept", "clarity", "completeness", "examples"}
+    assert all(0 <= v <= 100 for v in out["scores"].values())
+
+
+def test_overall_is_averaged_when_only_it_is_missing():
+    out = _normalise_teach_back({
+        "understanding": "partial",
+        "scores": {"concept": 80, "clarity": 60, "completeness": 40, "examples": 40},
+    })
+    assert out["scores"]["overall"] == 55
+
+
+def test_named_misconception_caps_the_overall_score():
+    """A 95 next to 'misconception detected' reads as a broken grader."""
+    out = _normalise_teach_back({
+        "understanding": "correct",
+        "scores": {k: 95 for k in ("overall", "concept", "clarity", "completeness", "examples")},
+        "misconceptions": [{"student_claim": "a", "problem": "b", "correct_concept": "c"}],
+    })
+    assert out["scores"]["overall"] <= 65
+    assert out["understanding"] == "misconception"
+
+
+def test_did_well_falls_back_to_correct_points():
+    """The praise panel must never be empty just because of a field-name choice."""
+    out = _normalise_teach_back({
+        "understanding": "correct",
+        "correct_points": ["you explained the energy transfer"],
+    })
+    assert out["did_well"] == ["you explained the energy transfer"]
+
+
+def test_feedback_lists_are_capped():
+    out = _normalise_teach_back({
+        "understanding": "partial",
+        "did_well": [f"point {i}" for i in range(9)],
+        "improve": [f"fix {i}" for i in range(9)],
+    })
+    assert len(out["did_well"]) == 4 and len(out["improve"]) == 4

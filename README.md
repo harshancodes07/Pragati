@@ -95,6 +95,7 @@ AI. It is isolated by design: its own provider, its own counters, and a blank
 | **Vision model dispatched by name, not one fixed request shape** | A "parse" family model (`nemotron-parse`) takes no text prompt at all, selects transcription mode via a `tools` field, and returns a tool call instead of message content — nothing like a general vision-chat model. `_is_parse_model()` in `provider.py` routes to the matching request builder. |
 | **LaTeX tables flattened before indexing** | `nemotron-parse` renders every detected table as raw LaTeX (`\begin{tabular}...`). Left alone, that markup pollutes RAG chunks and gets read aloud verbatim by TTS; `flatten_latex_tables()` turns each row into a plain line. |
 | **OCR cache keyed on the vision model, not just image bytes** | Switching `NVIDIA_MODEL_VISION` must invalidate cached transcriptions — otherwise a page OCR'd by a since-replaced (or since-fixed) model keeps being served from disk forever, silently. |
+| **Multiple uploaded files become one document, not N documents** | `chunk_pages` already thinks in page numbers, not files — so `/api/upload` extracts each file, concatenates their pages into one continuous list, and reuses the entire single-document pipeline (chunking, embedding, retrieval, citations) untouched. Extraction across files runs concurrently (`asyncio.to_thread`, capped at 3 at once) since OCR alone can take 3-15s per image and doing that serially across several photos would make a multi-page upload feel broken. |
 
 ### Asymmetric embeddings — the easiest thing to get wrong
 

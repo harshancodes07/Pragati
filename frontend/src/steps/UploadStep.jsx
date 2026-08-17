@@ -2,18 +2,25 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { Button, Card, ErrorNote, Reveal, Spinner } from '../components/common'
 
-// A dense photo can take a vision model 10-15s+ to transcribe — a static
-// spinner over that long reads as "stuck", so the label changes with elapsed
-// time to keep confirming the request is still alive.
-function uploadStatus(seconds) {
-  if (seconds < 4) return 'Reading the page…'
-  if (seconds < 10) return 'Still reading — dense or busy pages take longer…'
-  return `Still working (${seconds}s) — a detailed photo can take up to 20s…`
+const MAX_FILES = 8
+
+// A dense photo can take a vision model 10-15s+ to transcribe, and multiple
+// pages run in the same request — a static spinner over that long reads as
+// "stuck", so the label changes with elapsed time and file count.
+function uploadStatus(seconds, fileCount) {
+  const plural = fileCount > 1 ? 's' : ''
+  if (seconds < 4) return `Reading the page${plural}…`
+  if (seconds < 10) return `Still reading${fileCount > 1 ? ` all ${fileCount} pages` : ''} — dense or busy pages take longer…`
+  return `Still working (${seconds}s)${fileCount > 1 ? ` on ${fileCount} pages` : ''}…`
+}
+
+function fileKey(f) {
+  return `${f.name}:${f.size}`
 }
 
 export function UploadStep({ language, onReady }) {
   const [mode, setMode] = useState('file')
-  const [file, setFile] = useState(null)
+  const [files, setFiles] = useState([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -21,7 +28,7 @@ export function UploadStep({ language, onReady }) {
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef(null)
 
-  const canSubmit = mode === 'file' ? !!file : text.trim().length > 40
+  const canSubmit = mode === 'file' ? files.length > 0 : text.trim().length > 40
 
   useEffect(() => {
     if (!busy) return
@@ -35,9 +42,9 @@ export function UploadStep({ language, onReady }) {
     setError(null)
     try {
       const res = await api.upload({
-        file: mode === 'file' ? file : null,
+        files: mode === 'file' ? files : null,
         text: mode === 'text' ? text : null,
-        title: mode === 'file' ? file?.name : 'Pasted text',
+        title: mode === 'file' && files.length === 1 ? files[0].name : undefined,
         language,
       })
       onReady(res)
@@ -48,10 +55,28 @@ export function UploadStep({ language, onReady }) {
     }
   }
 
-  function pick(f) {
-    if (!f) return
-    setFile(f)
+  // Accumulates across successive picks/drops, deduped by name+size, so a
+  // student can add pages one photo at a time instead of selecting them all
+  // in a single dialog.
+  function addFiles(fileList) {
+    if (!fileList?.length) return
+    setFiles((prev) => {
+      const seen = new Set(prev.map(fileKey))
+      const merged = [...prev]
+      for (const f of fileList) {
+        const key = fileKey(f)
+        if (!seen.has(key)) {
+          merged.push(f)
+          seen.add(key)
+        }
+      }
+      return merged.slice(0, MAX_FILES)
+    })
     setError(null)
+  }
+
+  function removeFile(index) {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   return (
@@ -59,8 +84,8 @@ export function UploadStep({ language, onReady }) {
       <header>
         <h2 className="text-2xl font-semibold">Upload your textbook</h2>
         <p className="mt-1 text-sm text-muted">
-          A photo of a page, a PDF, or just paste the text. Bodhi will only ever
-          teach from what you give it here.
+          One or more page photos, a PDF, or just paste the text. Bodhi will
+          only ever teach from what you give it here.
         </p>
       </header>
 
@@ -94,7 +119,7 @@ export function UploadStep({ language, onReady }) {
             onDrop={(e) => {
               e.preventDefault()
               setDragging(false)
-              pick(e.dataTransfer.files?.[0])
+              addFiles(e.dataTransfer.files)
             }}
             onClick={() => inputRef.current?.click()}
             className={`cursor-pointer rounded-xl border-2 border-dashed p-10 text-center
@@ -105,21 +130,50 @@ export function UploadStep({ language, onReady }) {
             <input
               ref={inputRef}
               type="file"
+              multiple
               className="hidden"
               accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md"
-              onChange={(e) => pick(e.target.files?.[0])}
+              onChange={(e) => addFiles(e.target.files)}
             />
-            <div className="text-3xl">{file ? '📄' : '📚'}</div>
-            <p className="mt-3 text-sm">
-              {file ? (
-                <span className="font-medium text-saffron">{file.name}</span>
-              ) : (
-                <>
-                  Drop a page here, or <span className="text-saffron">browse</span>
-                </>
-              )}
-            </p>
-            <p className="mt-1 text-xs text-muted">PDF, PNG, JPG or TXT</p>
+
+            {files.length === 0 ? (
+              <>
+                <div className="text-3xl">📚</div>
+                <p className="mt-3 text-sm">
+                  Drop pages here, or <span className="text-saffron">browse</span>
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  PDF, PNG, JPG or TXT — up to {MAX_FILES} pages at once
+                </p>
+              </>
+            ) : (
+              <div className="space-y-2 text-left" onClick={(e) => e.stopPropagation()}>
+                {files.map((f, i) => (
+                  <div
+                    key={fileKey(f)}
+                    className="flex items-center justify-between gap-3 rounded-lg
+                      bg-ink/60 px-3 py-2 text-sm"
+                  >
+                    <span className="truncate text-slate-200">{f.name}</span>
+                    <button
+                      onClick={() => removeFile(i)}
+                      className="shrink-0 text-muted hover:text-alert"
+                      aria-label={`Remove ${f.name}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {files.length < MAX_FILES && (
+                  <p
+                    onClick={() => inputRef.current?.click()}
+                    className="cursor-pointer pt-1 text-center text-xs text-saffron"
+                  >
+                    + Add another page
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <textarea
@@ -137,9 +191,13 @@ export function UploadStep({ language, onReady }) {
 
       <div className="flex items-center gap-4">
         <Button onClick={submit} disabled={!canSubmit || busy}>
-          {busy ? 'Processing…' : 'Start learning'}
+          {busy
+            ? 'Processing…'
+            : files.length > 1
+              ? `Start learning from ${files.length} pages`
+              : 'Start learning'}
         </Button>
-        {busy && <Spinner label={uploadStatus(elapsed)} />}
+        {busy && <Spinner label={uploadStatus(elapsed, files.length)} />}
       </div>
     </Reveal>
   )

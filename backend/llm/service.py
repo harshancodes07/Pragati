@@ -83,29 +83,81 @@ def stream_tutor_response(question: str, chunks: list[dict], language: str) -> I
 _VALID_UNDERSTANDING = {"correct", "partial", "misconception", "incorrect"}
 _VALID_NEXT = {"reteach", "reinforce", "advance"}
 
+_SCORE_KEYS = ("overall", "concept", "clarity", "completeness", "examples")
+
+# Fallback when the model returns a label but no usable numbers. Keeps the
+# dashboard honest rather than showing a confident-looking zero.
+_UNDERSTANDING_TO_SCORE = {
+    "correct": 85, "partial": 60, "misconception": 40, "incorrect": 25,
+}
+
+
+def _clamp_score(value: Any, default: int) -> int:
+    """0-100 int, tolerating the '82/100', '82%' and 0.82 shapes models emit."""
+    if isinstance(value, str):
+        value = value.strip().rstrip("%").split("/")[0].strip()
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    # A model that answers 0.82 meant 82 — but a real 1/100 is vanishingly rare.
+    if 0 < number <= 1:
+        number *= 100
+    return max(0, min(100, round(number)))
+
+
+def _normalise_scores(raw: Any, understanding: str) -> dict[str, int]:
+    fallback = _UNDERSTANDING_TO_SCORE.get(understanding, 50)
+    if not isinstance(raw, dict):
+        raw = {}
+
+    scores = {k: _clamp_score(raw.get(k), fallback) for k in _SCORE_KEYS}
+
+    # If the model skipped "overall" specifically, average the parts it did give
+    # rather than inheriting a label-derived guess that ignores its own detail.
+    if raw.get("overall") is None:
+        parts = [scores[k] for k in _SCORE_KEYS if k != "overall"]
+        scores["overall"] = round(sum(parts) / len(parts))
+
+    return scores
+
 
 def evaluate_teach_back(
-    concept: str, explanation: str, chunks: list[dict], language: str
+    concept: str,
+    explanation: str,
+    chunks: list[dict],
+    language: str,
+    mode: str = prompts.DEFAULT_TEACH_BACK_MODE,
 ) -> dict[str, Any]:
+    audience = prompts.TEACH_BACK_MODES.get(
+        mode, prompts.TEACH_BACK_MODES[prompts.DEFAULT_TEACH_BACK_MODE]
+    )["goal"]
+
     user = (
         f"{prompts.build_context_block(chunks)}\n\n"
         f"Concept being tested: {concept}\n\n"
-        f"The student explained it in their own words:\n\"\"\"\n{explanation}\n\"\"\"\n\n"
-        "Evaluate their conceptual understanding. Ignore grammar, spelling, "
-        "script and language mixing entirely."
+        f"The student was asked to {audience}.\n\n"
+        f"They explained it in their own words:\n\"\"\"\n{explanation}\n\"\"\"\n\n"
+        "Evaluate their conceptual understanding against that audience. Ignore "
+        "grammar, spelling, script and language mixing entirely."
     )
 
     parsed = _structured_call(
-        prompts.teach_back_system_prompt(language), user, task="teachback"
+        prompts.teach_back_system_prompt(language, mode), user,
+        task="teachback", max_tokens=1800,
     )
 
     if parsed is None:
         # Never hard-fail in front of a judge — ask them to try again.
         return {
             "understanding": "partial",
+            "scores": {k: 0 for k in _SCORE_KEYS},
             "correct_points": [],
+            "did_well": [],
+            "improve": [],
             "misconceptions": [],
             "feedback": "I couldn't evaluate that properly. Try explaining it once more.",
+            "improved_explanation": "",
             "next_action": "reinforce",
             "degraded": True,
         }
@@ -139,13 +191,28 @@ def _normalise_teach_back(parsed: dict[str, Any]) -> dict[str, Any]:
     if next_action not in _VALID_NEXT:
         next_action = {"correct": "advance", "partial": "reinforce"}.get(understanding, "reteach")
 
-    points = [str(p).strip() for p in (parsed.get("correct_points") or []) if str(p).strip()]
+    def _points(key: str, limit: int = 4) -> list[str]:
+        return [str(p).strip() for p in (parsed.get(key) or []) if str(p).strip()][:limit]
+
+    points = _points("correct_points")
+    scores = _normalise_scores(parsed.get("scores"), understanding)
+
+    # A named misconception must be visible in the number, not just the prose —
+    # an 88 sitting next to "misconception detected" reads as a broken grader.
+    if misconceptions:
+        scores["overall"] = min(scores["overall"], 65)
 
     return {
         "understanding": understanding,
+        "scores": scores,
         "correct_points": points,
+        # Fall back to correct_points so the "what you did well" panel is never
+        # empty just because the model used the older field name.
+        "did_well": _points("did_well") or points,
+        "improve": _points("improve"),
         "misconceptions": misconceptions,
         "feedback": str(parsed.get("feedback", "")).strip(),
+        "improved_explanation": str(parsed.get("improved_explanation", "")).strip(),
         "next_action": next_action,
         "degraded": False,
     }
