@@ -26,7 +26,7 @@ export function ProgressStep({ doc, judgeMode }) {
         <p className="mt-1 text-sm text-muted">How this session has gone so far.</p>
       </header>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Stat label="Answered" value={progress.answered} />
         <Stat label="Correct" value={progress.correct} />
         <Stat
@@ -94,9 +94,9 @@ export function ProgressStep({ doc, judgeMode }) {
 
 function Stat({ label, value }) {
   return (
-    <Card className="text-center">
-      <div className="text-2xl font-semibold text-saffron">{value}</div>
-      <div className="mt-1 text-xs text-muted">{label}</div>
+    <Card compact className="text-center">
+      <div className="text-xl font-semibold text-saffron sm:text-2xl">{value}</div>
+      <div className="mt-1 text-[11px] text-muted sm:text-xs">{label}</div>
     </Card>
   )
 }

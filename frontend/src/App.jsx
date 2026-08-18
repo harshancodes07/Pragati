@@ -58,10 +58,11 @@ function StudyApp({ user, onLogout }) {
   const unlocked = (id) => id === 'upload' || !!doc
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-7xl gap-10 px-8 py-12">
+    <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6
+      sm:px-6 lg:flex-row lg:gap-10 lg:px-8 lg:py-12">
       {/* Step rail */}
-      <aside className="w-64 shrink-0">
-        <div className="glass-strong sticky top-12 space-y-6 rounded-2xl p-6">
+      <aside className="w-full lg:w-64 lg:shrink-0">
+        <div className="glass-strong space-y-5 rounded-2xl p-5 sm:p-6 lg:sticky lg:top-12 lg:space-y-6">
           <div className="flex items-center gap-3">
             <img src="/logo-512.png" alt="Pragati" className="h-10 w-10 rounded-xl object-contain" />
             <div>
@@ -96,7 +97,11 @@ function StudyApp({ user, onLogout }) {
             </div>
           )}
 
-          <nav className="space-y-1.5">
+          {/* Horizontal scrolling pills on mobile (a full vertical stack would push
+              everything else below the fold); reverts to a normal vertical list
+              once there's room for a sidebar. */}
+          <nav className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1
+            lg:mx-0 lg:flex-col lg:gap-1.5 lg:overflow-visible lg:px-0 lg:pb-0">
             {STEPS.map((s) => {
               const active = step === s.id
               const open = unlocked(s.id)
@@ -105,7 +110,8 @@ function StudyApp({ user, onLogout }) {
                   key={s.id}
                   disabled={!open}
                   onClick={() => setStep(s.id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] transition
+                  className={`flex shrink-0 items-center gap-3 rounded-xl px-4 py-3 text-[15px]
+                    transition lg:w-full lg:shrink
                     ${
                       active
                         ? 'bg-saffron/15 font-medium text-saffron'

@@ -136,7 +136,8 @@ export function UploadStep({ language, onReady }) {
                 addFiles(e.dataTransfer.files)
               }}
               onClick={() => inputRef.current?.click()}
-              className={`cursor-pointer rounded-2xl border-2 border-dashed px-10 py-20 text-center
+              className={`cursor-pointer rounded-2xl border-2 border-dashed px-6 py-12 text-center
+                sm:px-10 sm:py-20
                 transition ${
                   dragging ? 'border-saffron bg-saffron/5' : 'border-line hover:border-muted'
                 }`}

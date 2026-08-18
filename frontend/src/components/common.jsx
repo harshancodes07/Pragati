@@ -1,8 +1,11 @@
 import { motion } from 'framer-motion'
 
-export function Card({ children, className = '' }) {
+export function Card({ children, className = '', compact = false }) {
+  // Compact: for cards packed several-to-a-row (e.g. a 3-up stat grid), where
+  // the default padding would leave almost no room for content on mobile.
+  const padding = compact ? 'p-3 sm:p-5' : 'p-7 sm:p-8'
   return (
-    <div className={`glass rounded-2xl p-7 sm:p-8 ${className}`}>
+    <div className={`glass rounded-2xl ${padding} ${className}`}>
       {children}
     </div>
   )

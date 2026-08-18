@@ -153,8 +153,8 @@ export function DoubtChat({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="glass-strong absolute bottom-12 right-0 z-40 flex h-96 w-[min(22rem,88vw)]
-              flex-col overflow-hidden rounded-2xl"
+            className="glass-strong absolute bottom-12 right-0 z-40 flex h-96
+              max-h-[70vh] w-[min(22rem,88vw)] flex-col overflow-hidden rounded-2xl"
           >
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -229,13 +229,14 @@ export function RestoredChatModal({ chat, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
       <motion.div
         initial={{ opacity: 0, y: 10, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.97 }}
         transition={{ duration: 0.15 }}
-        className="glass-strong flex h-[32rem] w-full max-w-lg flex-col overflow-hidden rounded-2xl"
+        className="glass-strong flex h-[32rem] max-h-[85vh] w-full max-w-lg flex-col
+          overflow-hidden rounded-2xl"
       >
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <div className="min-w-0">
