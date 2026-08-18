@@ -4,8 +4,25 @@
 // public domain — set it in Vercel's project env vars, no trailing slash.
 const BASE = `${import.meta.env.VITE_API_URL || ''}/api`
 
+// Set once at login (and restored from localStorage on load) so every call
+// below carries it automatically — callers never pass it explicitly.
+let authToken = null
+export function setAuthToken(token) {
+  authToken = token
+}
+
+// Fired when a call comes back 401 — App listens for this to drop back to
+// the login screen (an expired/invalid token, not a per-call error to handle).
+export const AUTH_EVENT = 'pragati:unauthorized'
+
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, options)
+  const headers = { ...options.headers }
+  if (authToken) headers.Authorization = `Bearer ${authToken}`
+
+  const res = await fetch(`${BASE}${path}`, { ...options, headers })
+  if (res.status === 401) {
+    window.dispatchEvent(new Event(AUTH_EVENT))
+  }
   if (!res.ok) {
     let detail = `Request failed (${res.status})`
     try {
@@ -26,6 +43,7 @@ const json = (body) => ({
 export const api = {
   health: () => request('/health'),
   stats: () => request('/stats'),
+  loginWithGoogle: (credential) => request('/auth/google', json({ credential })),
 
   upload: ({ files, text, title, language }) => {
     const form = new FormData()

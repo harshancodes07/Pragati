@@ -10,12 +10,13 @@ import json
 import time
 from typing import Any, Literal
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend import adaptive, db
+from backend.auth import AuthError, issue_session_token, require_user, verify_google_token
 from backend.config import settings
 from backend.ingest.chunk import chunk_pages
 from backend.ingest.extract import ExtractionError, extract
@@ -107,6 +108,12 @@ class TTSRequest(BaseModel):
     language: str = "tanglish"
 
 
+class GoogleAuthRequest(BaseModel):
+    # The ID token Google Identity Services hands back to the frontend after
+    # a successful sign-in — verified here, never trusted as-is.
+    credential: str = Field(min_length=1)
+
+
 # -------------------------------------------------------------------- health
 
 @app.get("/api/health")
@@ -148,6 +155,28 @@ def health() -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------- auth
+
+@app.post("/api/auth/google")
+def auth_google(req: GoogleAuthRequest) -> dict[str, Any]:
+    """Exchanges a verified Google identity for the app's own session token —
+    everything past the login page authenticates with that token, not Google's."""
+    try:
+        profile = verify_google_token(req.credential)
+        token = issue_session_token(profile)
+    except AuthError as exc:
+        raise HTTPException(401, str(exc)) from exc
+
+    return {
+        "token": token,
+        "user": {
+            "email": profile["email"],
+            "name": profile["name"],
+            "picture": profile["picture"],
+        },
+    }
+
+
 # -------------------------------------------------------------------- upload
 
 # A hard cap keeps a mis-click from turning into a multi-minute OCR bill; the
@@ -174,7 +203,7 @@ async def _extract_one(f: UploadFile, semaphore: asyncio.Semaphore) -> tuple[lis
             raise HTTPException(503, f"Couldn't process '{f.filename}': {exc}") from exc
 
 
-@app.post("/api/upload")
+@app.post("/api/upload", dependencies=[Depends(require_user)])
 async def upload(
     files: list[UploadFile] | None = File(default=None),
     text: str | None = Form(default=None),
@@ -276,7 +305,7 @@ def _require_voice() -> None:
         raise HTTPException(503, "Voice is not configured. Set SARVAM_API_KEY in .env.")
 
 
-@app.post("/api/stt")
+@app.post("/api/stt", dependencies=[Depends(require_user)])
 async def speech_to_text(
     file: UploadFile = File(...),
     language: str = Form(default="tanglish"),
@@ -298,7 +327,7 @@ async def speech_to_text(
         raise HTTPException(503, f"Couldn't hear that: {exc}") from exc
 
 
-@app.post("/api/tts")
+@app.post("/api/tts", dependencies=[Depends(require_user)])
 def text_to_speech(req: TTSRequest) -> dict[str, Any]:
     """Text -> ordered base64 mp3 clips for the browser to play in sequence."""
     _require_voice()
@@ -310,7 +339,7 @@ def text_to_speech(req: TTSRequest) -> dict[str, Any]:
 
 # ----------------------------------------------------------------------- ask
 
-@app.post("/api/ask")
+@app.post("/api/ask", dependencies=[Depends(require_user)])
 def ask(req: AskRequest) -> Any:
     result = retrieve(req.question, document_id=req.document_id)
 
@@ -386,7 +415,7 @@ def ask(req: AskRequest) -> Any:
 
 # ---------------------------------------------------------------- teach-back
 
-@app.post("/api/teachback")
+@app.post("/api/teachback", dependencies=[Depends(require_user)])
 def teach_back(req: TeachBackRequest) -> dict[str, Any]:
     session = db.get_session(req.session_id)
     if session is None:
@@ -435,7 +464,7 @@ def teach_back(req: TeachBackRequest) -> dict[str, Any]:
 
 # ---------------------------------------------------------------------- doubt
 
-@app.post("/api/doubt")
+@app.post("/api/doubt", dependencies=[Depends(require_user)])
 def doubt(req: DoubtRequest) -> dict[str, Any]:
     """Follow-up chat anchored to one already-generated explanation."""
     session = db.get_session(req.session_id)
@@ -481,7 +510,7 @@ def doubt(req: DoubtRequest) -> dict[str, Any]:
 
 # ----------------------------------------------------------------- chats
 
-@app.get("/api/chats")
+@app.get("/api/chats", dependencies=[Depends(require_user)])
 def chats(session_id: str | None = None) -> dict[str, Any]:
     """Recent Chats sidebar: newest-first, title + language + timestamp only."""
     rows = db.list_chats(session_id)
@@ -501,7 +530,7 @@ def chats(session_id: str | None = None) -> dict[str, Any]:
     }
 
 
-@app.get("/api/chats/{chat_id}")
+@app.get("/api/chats/{chat_id}", dependencies=[Depends(require_user)])
 def get_chat(chat_id: str) -> dict[str, Any]:
     """Full chat, used to restore the thread and its grounding context."""
     chat = db.get_chat(chat_id)
@@ -512,7 +541,7 @@ def get_chat(chat_id: str) -> dict[str, Any]:
 
 # ------------------------------------------------------------------ practice
 
-@app.post("/api/practice")
+@app.post("/api/practice", dependencies=[Depends(require_user)])
 def practice(req: PracticeRequest) -> dict[str, Any]:
     session = db.get_session(req.session_id)
     if session is None:
@@ -556,7 +585,7 @@ def practice(req: PracticeRequest) -> dict[str, Any]:
     }
 
 
-@app.post("/api/practice/submit")
+@app.post("/api/practice/submit", dependencies=[Depends(require_user)])
 def submit_practice(req: SubmitRequest) -> dict[str, Any]:
     questions = _practice_sets.get(req.set_id)
     if questions is None:
@@ -592,19 +621,19 @@ def submit_practice(req: SubmitRequest) -> dict[str, Any]:
 
 # ------------------------------------------------------------------ progress
 
-@app.get("/api/progress/{session_id}")
+@app.get("/api/progress/{session_id}", dependencies=[Depends(require_user)])
 def progress(session_id: str) -> dict[str, Any]:
     if db.get_session(session_id) is None:
         raise HTTPException(404, "Session not found.")
     return db.session_progress(session_id)
 
 
-@app.get("/api/documents")
+@app.get("/api/documents", dependencies=[Depends(require_user)])
 def documents() -> dict[str, Any]:
     return {"documents": db.list_documents()}
 
 
-@app.get("/api/stats")
+@app.get("/api/stats", dependencies=[Depends(require_user)])
 def get_stats() -> dict[str, Any]:
     """Judge mode: proves the out-of-scope refusal spends no NIM call."""
     speech = speech_stats.snapshot()

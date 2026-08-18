@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { LANGUAGES, api } from './api'
+import { AUTH_EVENT, LANGUAGES, api, setAuthToken } from './api'
 import { Badge, Card } from './components/common'
 import { LanguageModal } from './components/LanguageModal'
 import { RecentChats } from './components/RecentChats'
 import { RestoredChatModal } from './components/DoubtChat'
 import { LandingPage } from './LandingPage'
+import { LoginPage } from './LoginPage'
 import { UploadStep } from './steps/UploadStep'
 import { LearnStep } from './steps/LearnStep'
 import { TeachBackStep } from './steps/TeachBackStep'
@@ -20,7 +21,7 @@ const STEPS = [
   { id: 'progress', label: 'Progress', icon: '📈' },
 ]
 
-function StudyApp() {
+function StudyApp({ user, onLogout }) {
   const [step, setStep] = useState('upload')
   const [language, setLanguage] = useState('tanglish')
   const [languageChosen, setLanguageChosen] = useState(false)
@@ -70,6 +71,30 @@ function StudyApp() {
               <p className="mt-1.5 text-sm text-muted">Your textbook, your language</p>
             </div>
           </div>
+
+          {user && (
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-line
+              bg-raised px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                {user.picture ? (
+                  <img src={user.picture} alt="" className="h-7 w-7 shrink-0 rounded-full" />
+                ) : (
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+                    bg-saffron/15 text-xs font-semibold text-saffron">
+                    {(user.name || user.email || '?')[0].toUpperCase()}
+                  </span>
+                )}
+                <span className="truncate text-sm text-[#1D1D1F]">{user.name || user.email}</span>
+              </div>
+              <button
+                onClick={onLogout}
+                title="Sign out"
+                className="shrink-0 text-xs text-muted transition hover:text-alert"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
 
           <nav className="space-y-1.5">
             {STEPS.map((s) => {
@@ -273,12 +298,58 @@ function StudyApp() {
   )
 }
 
+// landing (marketing) -> login (Google sign-in) -> app (the study tools).
+// A restored token skips straight to 'app'; a 401 from any API call (expired
+// or invalid token) drops back to 'login', wherever the student was.
 export default function App() {
-  const [started, setStarted] = useState(false)
+  const [screen, setScreen] = useState('landing')
+  const [user, setUser] = useState(null)
 
-  if (!started) {
-    return <LandingPage onStart={() => setStarted(true)} />
+  useEffect(() => {
+    const savedToken = localStorage.getItem('pragati.authToken')
+    const savedUser = localStorage.getItem('pragati.authUser')
+    if (savedToken && savedUser) {
+      setAuthToken(savedToken)
+      setUser(JSON.parse(savedUser))
+      setScreen('app')
+    }
+  }, [])
+
+  useEffect(() => {
+    function handleUnauthorized() {
+      localStorage.removeItem('pragati.authToken')
+      localStorage.removeItem('pragati.authUser')
+      setAuthToken(null)
+      setUser(null)
+      setScreen('login')
+    }
+    window.addEventListener(AUTH_EVENT, handleUnauthorized)
+    return () => window.removeEventListener(AUTH_EVENT, handleUnauthorized)
+  }, [])
+
+  function handleLogin({ token, user: signedInUser }) {
+    localStorage.setItem('pragati.authToken', token)
+    localStorage.setItem('pragati.authUser', JSON.stringify(signedInUser))
+    setAuthToken(token)
+    setUser(signedInUser)
+    setScreen('app')
   }
 
-  return <StudyApp />
+  function handleLogout() {
+    localStorage.removeItem('pragati.authToken')
+    localStorage.removeItem('pragati.authUser')
+    setAuthToken(null)
+    setUser(null)
+    setScreen('landing')
+  }
+
+  if (screen === 'landing') {
+    return <LandingPage onStart={() => setScreen('login')} />
+  }
+
+  if (screen === 'login') {
+    return <LoginPage onLogin={handleLogin} onBack={() => setScreen('landing')} />
+  }
+
+  return <StudyApp user={user} onLogout={handleLogout} />
 }

@@ -57,6 +57,16 @@ class Settings(BaseSettings):
     # production origin has to come from an env var rather than being hardcoded.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # Google Sign-In. The client ID isn't secret (it's shipped to the browser
+    # too, as VITE_GOOGLE_CLIENT_ID), but the backend needs it to verify a
+    # Google ID token was actually issued for *this* app, not some other one.
+    google_client_id: str = ""
+    # Signs the app's own short-lived session token after Google verification.
+    # Must be set to a real random value in production — the empty default is
+    # only safe for local dev, and login endpoints refuse to run without it.
+    jwt_secret: str = ""
+    jwt_expiry_hours: int = 24 * 7
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
