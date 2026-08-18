@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     data_dir: Path = ROOT / "data"
     db_path: Path = ROOT / "data" / "pragati.db"
 
+    # Comma-separated allowed origins for the frontend. Deployed platforms
+    # (Railway, Vercel, etc.) don't share a hostname with dev, so the
+    # production origin has to come from an env var rather than being hardcoded.
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     @property
     def tutor_model(self) -> str:
         return self.nvidia_model_tutor or self.nvidia_model
