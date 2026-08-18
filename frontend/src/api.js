@@ -1,4 +1,8 @@
-const BASE = '/api'
+// In dev, Vite proxies /api to localhost:8000 (see vite.config.js) so a
+// relative path works. In production the frontend and backend are deployed
+// separately (Vercel + Railway), so VITE_API_URL points at the backend's
+// public domain — set it in Vercel's project env vars, no trailing slash.
+const BASE = `${import.meta.env.VITE_API_URL || ''}/api`
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, options)
