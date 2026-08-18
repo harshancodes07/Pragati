@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 
 export function Card({ children, className = '' }) {
   return (
-    <div className={`rounded-2xl border border-line bg-surface p-6 ${className}`}>
+    <div className={`glass rounded-2xl p-7 sm:p-8 ${className}`}>
       {children}
     </div>
   )
@@ -10,14 +10,14 @@ export function Card({ children, className = '' }) {
 
 export function Button({ children, variant = 'primary', className = '', ...props }) {
   const styles = {
-    primary: 'bg-saffron text-white hover:brightness-110 font-semibold',
+    primary: 'bg-saffron text-white shadow-lg shadow-saffron/25 hover:brightness-110 font-semibold',
     ghost: 'border border-line text-[#1D1D1F] hover:bg-raised',
     subtle: 'text-muted hover:text-[#1D1D1F]',
   }[variant]
 
   return (
     <button
-      className={`rounded-xl px-5 py-2.5 text-sm transition disabled:cursor-not-allowed
+      className={`rounded-xl px-6 py-3.5 text-[15px] transition disabled:cursor-not-allowed
         disabled:opacity-40 ${styles} ${className}`}
       {...props}
     >

@@ -1,0 +1,55 @@
+/*
+ * Glassmorphism module — the single source of truth for every frosted
+ * surface in the app (cards, sidebar, modals). Built on the standard
+ * frosted-glass recipe (translucent fill + backdrop blur/saturate + a
+ * hairline highlight border + a soft ambient shadow), not ad-hoc
+ * backdrop-blur classes scattered per component.
+ *
+ * Usage: apply one class — .glass / .glass-strong / .glass-subtle — in
+ * place of a flat bg-surface/bg-white. All three degrade to a plain white
+ * fill on browsers without backdrop-filter support (see @supports below).
+ */
+
+.glass,
+.glass-strong,
+.glass-subtle {
+  position: relative;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 8px 32px rgba(31, 38, 135, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Denser fill for surfaces that carry a lot of text (sidebar, modals) —
+   needs the extra opacity to stay legible over the ambient background. */
+.glass-strong {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 12px 40px rgba(31, 38, 135, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* Lighter touch for small/secondary chips and nested surfaces. */
+.glass-subtle {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.05);
+}
+
+/* No backdrop-filter support (older browsers) — fall back to a solid
+   surface rather than a washed-out translucent panel over content. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong,
+  .glass-subtle {
+    background: #ffffff;
+  }
+}

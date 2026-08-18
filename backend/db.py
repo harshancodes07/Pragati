@@ -54,6 +54,22 @@ CREATE TABLE IF NOT EXISTS interactions (
 );
 CREATE INDEX IF NOT EXISTS idx_inter_session ON interactions(session_id);
 
+-- One row per doubt-chat thread, so it can be listed as a "Recent Chats"
+-- sidebar and re-opened with its full history and grounding context intact.
+CREATE TABLE IF NOT EXISTS chats (
+    id            TEXT PRIMARY KEY,
+    session_id    TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    document_id   TEXT REFERENCES documents(id) ON DELETE CASCADE,
+    title         TEXT NOT NULL,
+    concept       TEXT,
+    explanation   TEXT,
+    language      TEXT NOT NULL DEFAULT 'tanglish',
+    messages      TEXT NOT NULL DEFAULT '[]',   -- JSON list of {role, content}
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_chats_session ON chats(session_id);
+
 CREATE TABLE IF NOT EXISTS performance (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id    TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -139,6 +155,75 @@ def set_difficulty(session_id: str, difficulty: str) -> None:
     conn = get_conn()
     conn.execute("UPDATE sessions SET difficulty = ? WHERE id = ?", (difficulty, session_id))
     conn.commit()
+
+
+# ------------------------------------------------------------------- chats
+
+def _chat_title(concept: str | None, messages: list[dict[str, Any]]) -> str:
+    """Best-effort topic title: the concept it was asked about, else the
+    student's opening question, trimmed to sidebar length."""
+    basis = (concept or "").strip()
+    if not basis and messages:
+        basis = next((m["content"] for m in messages if m.get("role") == "user"), "")
+    basis = " ".join(basis.split())
+    return (basis[:60] + "…") if len(basis) > 60 else (basis or "Doubt chat")
+
+
+def create_chat(
+    session_id: str,
+    document_id: str | None,
+    concept: str | None,
+    explanation: str | None,
+    language: str,
+    messages: list[dict[str, Any]],
+) -> str:
+    chat_id = f"chat_{uuid.uuid4().hex[:12]}"
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO chats (id, session_id, document_id, title, concept, explanation, language, messages)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        (chat_id, session_id, document_id, _chat_title(concept, messages), concept,
+         explanation, language, json.dumps(messages, ensure_ascii=False)),
+    )
+    conn.commit()
+    return chat_id
+
+
+def update_chat_messages(chat_id: str, messages: list[dict[str, Any]]) -> None:
+    conn = get_conn()
+    conn.execute(
+        "UPDATE chats SET messages = ?, updated_at = datetime('now') WHERE id = ?",
+        (json.dumps(messages, ensure_ascii=False), chat_id),
+    )
+    conn.commit()
+
+
+def get_chat(chat_id: str) -> dict[str, Any] | None:
+    row = get_conn().execute("SELECT * FROM chats WHERE id = ?", (chat_id,)).fetchone()
+    if row is None:
+        return None
+    chat = dict(row)
+    chat["messages"] = json.loads(chat["messages"])
+    return chat
+
+
+def list_chats(session_id: str | None = None, limit: int = 30) -> list[dict[str, Any]]:
+    conn = get_conn()
+    if session_id:
+        rows = conn.execute(
+            "SELECT * FROM chats WHERE session_id = ? ORDER BY updated_at DESC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM chats ORDER BY updated_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+    chats = []
+    for row in rows:
+        chat = dict(row)
+        chat["messages"] = json.loads(chat["messages"])
+        chats.append(chat)
+    return chats
 
 
 # --------------------------------------------------------------- interactions

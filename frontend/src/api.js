@@ -48,6 +48,10 @@ export const api = {
   practice: (body) => request('/practice', json(body)),
   submitPractice: (body) => request('/practice/submit', json(body)),
   progress: (sessionId) => request(`/progress/${sessionId}`),
+
+  listChats: (sessionId) =>
+    request(`/chats${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`),
+  getChat: (chatId) => request(`/chats/${chatId}`),
 }
 
 export const LANGUAGES = [

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { Button, Card, ErrorNote, Reveal, Spinner } from '../components/common'
+import { CameraCapture } from '../components/CameraCapture'
 
 const MAX_FILES = 8
 
@@ -26,6 +27,7 @@ export function UploadStep({ language, onReady }) {
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
   const [dragging, setDragging] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
   const inputRef = useRef(null)
 
   const canSubmit = mode === 'file' ? files.length > 0 : text.trim().length > 40
@@ -80,26 +82,29 @@ export function UploadStep({ language, onReady }) {
   }
 
   return (
-    <Reveal className="space-y-5">
+    <Reveal className="space-y-6">
       <header>
-        <h2 className="text-2xl font-semibold">Upload your textbook</h2>
-        <p className="mt-1 text-sm text-muted">
+        <h2 className="text-3xl font-semibold tracking-tight">Upload your textbook</h2>
+        <p className="mt-2 text-[15px] leading-relaxed text-muted">
           One or more page photos, a PDF, or just paste the text. Pragati will
           only ever teach from what you give it here.
         </p>
       </header>
 
-      <div className="flex gap-2">
+      <div className="inline-flex gap-1 rounded-xl border border-line bg-raised p-1">
         {[
           ['file', 'Photo or PDF'],
           ['text', 'Paste text'],
         ].map(([id, label]) => (
           <button
             key={id}
-            onClick={() => setMode(id)}
-            className={`rounded-lg px-4 py-2 text-sm transition ${
+            onClick={() => {
+              setMode(id)
+              setShowCamera(false)
+            }}
+            className={`rounded-lg px-5 py-2.5 text-sm font-medium transition ${
               mode === id
-                ? 'bg-saffron/15 text-saffron'
+                ? 'bg-white text-saffron shadow-[0_1px_2px_rgba(0,0,0,0.08)]'
                 : 'text-muted hover:text-[#1D1D1F]'
             }`}
           >
@@ -110,95 +115,137 @@ export function UploadStep({ language, onReady }) {
 
       <Card>
         {mode === 'file' ? (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault()
-              setDragging(true)
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDragging(false)
-              addFiles(e.dataTransfer.files)
-            }}
-            onClick={() => inputRef.current?.click()}
-            className={`cursor-pointer rounded-xl border-2 border-dashed p-10 text-center
-              transition ${
-                dragging ? 'border-saffron bg-saffron/5' : 'border-line hover:border-muted'
-              }`}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              multiple
-              className="hidden"
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md"
-              onChange={(e) => addFiles(e.target.files)}
+          showCamera ? (
+            <CameraCapture
+              onCapture={(file) => {
+                addFiles([file])
+                setShowCamera(false)
+              }}
+              onCancel={() => setShowCamera(false)}
             />
+          ) : (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragging(true)
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragging(false)
+                addFiles(e.dataTransfer.files)
+              }}
+              onClick={() => inputRef.current?.click()}
+              className={`cursor-pointer rounded-2xl border-2 border-dashed px-10 py-20 text-center
+                transition ${
+                  dragging ? 'border-saffron bg-saffron/5' : 'border-line hover:border-muted'
+                }`}
+            >
+              <input
+                ref={inputRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md"
+                onChange={(e) => addFiles(e.target.files)}
+              />
 
-            {files.length === 0 ? (
-              <>
-                <div className="text-3xl">📚</div>
-                <p className="mt-3 text-sm">
-                  Drop pages here, or <span className="text-saffron">browse</span>
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  PDF, PNG, JPG or TXT — up to {MAX_FILES} pages at once
-                </p>
-              </>
-            ) : (
-              <div className="space-y-2 text-left" onClick={(e) => e.stopPropagation()}>
-                {files.map((f, i) => (
-                  <div
-                    key={fileKey(f)}
-                    className="flex items-center justify-between gap-3 rounded-lg
-                      bg-raised px-3 py-2 text-sm"
-                  >
-                    <span className="truncate text-[#1D1D1F]">{f.name}</span>
-                    <button
-                      onClick={() => removeFile(i)}
-                      className="shrink-0 text-muted hover:text-alert"
-                      aria-label={`Remove ${f.name}`}
-                    >
-                      ✕
-                    </button>
+              {files.length === 0 ? (
+                <>
+                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full
+                    bg-saffron/10 text-5xl">
+                    📚
                   </div>
-                ))}
-                {files.length < MAX_FILES && (
-                  <p
-                    onClick={() => inputRef.current?.click()}
-                    className="cursor-pointer pt-1 text-center text-xs text-saffron"
-                  >
-                    + Add another page
+                  <p className="mt-6 text-lg font-medium text-[#1D1D1F]">
+                    Drop pages here, or <span className="text-saffron">browse</span>
                   </p>
-                )}
-              </div>
-            )}
-          </div>
+                  <p className="mt-2 text-sm text-muted">
+                    PDF, PNG, JPG or TXT — up to {MAX_FILES} pages at once
+                  </p>
+                  <div className="mx-auto mt-4 w-fit border-t border-line pt-4 text-xs text-muted">
+                    or
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowCamera(true)
+                    }}
+                    className="relative z-10 mt-4 inline-flex items-center gap-2 rounded-xl
+                      border border-line bg-white px-6 py-3 text-sm font-medium text-[#1D1D1F]
+                      shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-saffron
+                      hover:bg-saffron/5"
+                  >
+                    📷 Scan & Learn
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-2.5 text-left" onClick={(e) => e.stopPropagation()}>
+                  {files.map((f, i) => (
+                    <div
+                      key={fileKey(f)}
+                      className="flex items-center justify-between gap-3 rounded-xl
+                        bg-raised px-4 py-3 text-sm"
+                    >
+                      <span className="truncate text-[#1D1D1F]">{f.name}</span>
+                      <button
+                        onClick={() => removeFile(i)}
+                        className="shrink-0 text-muted hover:text-alert"
+                        aria-label={`Remove ${f.name}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap items-center justify-center gap-5 pt-2">
+                    {files.length < MAX_FILES && (
+                      <p
+                        onClick={() => inputRef.current?.click()}
+                        className="cursor-pointer text-center text-sm font-medium text-saffron"
+                      >
+                        + Add another page
+                      </p>
+                    )}
+                    {files.length < MAX_FILES && (
+                      <p
+                        onClick={() => setShowCamera(true)}
+                        className="cursor-pointer text-center text-sm font-medium text-saffron"
+                      >
+                        📷 Scan another page
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
         ) : (
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            rows={10}
+            rows={12}
             placeholder="Paste a passage from your textbook…"
-            className="w-full resize-none rounded-xl border border-line bg-white p-4 text-sm
-              outline-none placeholder:text-muted focus:border-saffron"
+            className="w-full resize-none rounded-xl border border-line bg-white p-5 text-[15px]
+              leading-relaxed outline-none placeholder:text-muted focus:border-saffron"
           />
         )}
       </Card>
 
-      <ErrorNote>{error}</ErrorNote>
+      {!showCamera && (
+        <>
+          <ErrorNote>{error}</ErrorNote>
 
-      <div className="flex items-center gap-4">
-        <Button onClick={submit} disabled={!canSubmit || busy}>
-          {busy
-            ? 'Processing…'
-            : files.length > 1
-              ? `Start learning from ${files.length} pages`
-              : 'Start learning'}
-        </Button>
-        {busy && <Spinner label={uploadStatus(elapsed, files.length)} />}
-      </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <Button onClick={submit} disabled={!canSubmit || busy}>
+              {busy
+                ? 'Processing…'
+                : files.length > 1
+                  ? `Start learning from ${files.length} pages`
+                  : 'Start learning'}
+            </Button>
+            {busy && <Spinner label={uploadStatus(elapsed, files.length)} />}
+          </div>
+        </>
+      )}
     </Reveal>
   )
 }

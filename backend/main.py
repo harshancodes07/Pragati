@@ -93,11 +93,12 @@ class DoubtMessage(BaseModel):
 class DoubtRequest(BaseModel):
     document_id: str | None = None
     session_id: str
+    chat_id: str | None = None  # continues a saved chat; omitted starts a new one
     concept: str = Field(default="", max_length=500)
     explanation: str = Field(min_length=1, max_length=6000)
     language: str = "tanglish"
-    # The whole thread, ending with the student's latest doubt. Stateless by
-    # design — the popup owns history, matching how sessions carry no chat log.
+    # The whole thread, ending with the student's latest doubt. The popup owns
+    # history in-memory; the server persists it under chat_id for Recent Chats.
     messages: list[DoubtMessage] = Field(default_factory=list, max_length=20)
 
 
@@ -463,7 +464,50 @@ def doubt(req: DoubtRequest) -> dict[str, Any]:
     except NIMError as exc:
         raise HTTPException(503, "Couldn't answer that. Try again.") from exc
 
-    return {"answer": answer, "sources": result.to_sources(2)}
+    full_messages = [m.model_dump() for m in req.messages] + [
+        {"role": "assistant", "content": answer}
+    ]
+    doc_id = req.document_id or session.get("document_id")
+    if req.chat_id and db.get_chat(req.chat_id):
+        db.update_chat_messages(req.chat_id, full_messages)
+        chat_id = req.chat_id
+    else:
+        chat_id = db.create_chat(
+            req.session_id, doc_id, req.concept, req.explanation, req.language, full_messages
+        )
+
+    return {"answer": answer, "sources": result.to_sources(2), "chat_id": chat_id}
+
+
+# ----------------------------------------------------------------- chats
+
+@app.get("/api/chats")
+def chats(session_id: str | None = None) -> dict[str, Any]:
+    """Recent Chats sidebar: newest-first, title + language + timestamp only."""
+    rows = db.list_chats(session_id)
+    return {
+        "chats": [
+            {
+                "id": c["id"],
+                "title": c["title"],
+                "language": c["language"],
+                "concept": c["concept"],
+                "created_at": c["created_at"],
+                "updated_at": c["updated_at"],
+                "message_count": len(c["messages"]),
+            }
+            for c in rows
+        ]
+    }
+
+
+@app.get("/api/chats/{chat_id}")
+def get_chat(chat_id: str) -> dict[str, Any]:
+    """Full chat, used to restore the thread and its grounding context."""
+    chat = db.get_chat(chat_id)
+    if chat is None:
+        raise HTTPException(404, "Chat not found.")
+    return chat
 
 
 # ------------------------------------------------------------------ practice

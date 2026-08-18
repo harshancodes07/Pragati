@@ -3,6 +3,8 @@ import { AnimatePresence } from 'framer-motion'
 import { LANGUAGES, api } from './api'
 import { Badge, Card } from './components/common'
 import { LanguageModal } from './components/LanguageModal'
+import { RecentChats } from './components/RecentChats'
+import { RestoredChatModal } from './components/DoubtChat'
 import { LandingPage } from './LandingPage'
 import { UploadStep } from './steps/UploadStep'
 import { LearnStep } from './steps/LearnStep'
@@ -34,6 +36,14 @@ function StudyApp() {
   const [autoSpeak, setAutoSpeak] = useState(
     () => localStorage.getItem('bodhi.autoSpeak') === '1',
   )
+  const [chatsRefresh, setChatsRefresh] = useState(0)
+  const [restoredChat, setRestoredChat] = useState(null)
+
+  async function openChat(chatId) {
+    try {
+      setRestoredChat(await api.getChat(chatId))
+    } catch { /* chat may have expired; silently ignore */ }
+  }
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth({ status: 'down' }))
@@ -50,114 +60,119 @@ function StudyApp() {
   const unlocked = (id) => id === 'upload' || !!doc
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl gap-8 px-6 py-8">
+    <div className="mx-auto flex min-h-screen max-w-7xl gap-10 px-8 py-12">
       {/* Step rail */}
-      <aside className="w-52 shrink-0">
-        <div className="mb-8">
-          <h1 className="text-xl font-semibold tracking-tight">
-            Pragati <span className="text-saffron">·</span> பிரகதி
-          </h1>
-          <p className="mt-1 text-xs text-muted">Your textbook, your language</p>
-        </div>
+      <aside className="w-64 shrink-0">
+        <div className="glass-strong sticky top-12 space-y-6 rounded-2xl p-6">
+          <div className="flex items-center gap-3">
+            <img src="/logo-512.png" alt="Pragati" className="h-10 w-10 rounded-xl object-contain" />
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Pragati <span className="text-saffron">·</span> பிரகதி
+              </h1>
+              <p className="mt-1.5 text-sm text-muted">Your textbook, your language</p>
+            </div>
+          </div>
 
-        <nav className="space-y-1">
-          {STEPS.map((s) => {
-            const active = step === s.id
-            const open = unlocked(s.id)
-            return (
+          <nav className="space-y-1.5">
+            {STEPS.map((s) => {
+              const active = step === s.id
+              const open = unlocked(s.id)
+              return (
+                <button
+                  key={s.id}
+                  disabled={!open}
+                  onClick={() => setStep(s.id)}
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] transition
+                    ${
+                      active
+                        ? 'bg-saffron/15 font-medium text-saffron'
+                        : open
+                          ? 'text-muted hover:bg-raised hover:text-[#1D1D1F]'
+                          : 'cursor-not-allowed text-line'
+                    }`}
+                >
+                  <span className={`text-lg ${open ? '' : 'opacity-30'}`}>{s.icon}</span>
+                  {s.label}
+                </button>
+              )
+            })}
+          </nav>
+
+          <div className="space-y-3 border-t border-line pt-6">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted">
+              Language
+            </label>
+            {languageChosen ? (
               <button
-                key={s.id}
-                disabled={!open}
-                onClick={() => setStep(s.id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition
-                  ${
-                    active
-                      ? 'bg-saffron/15 font-medium text-saffron'
-                      : open
-                        ? 'text-muted hover:bg-raised hover:text-[#1D1D1F]'
-                        : 'cursor-not-allowed text-line'
-                  }`}
+                onClick={() => setLanguageModalOpen(true)}
+                className="flex w-full items-center justify-between rounded-xl border border-line
+                  bg-raised px-4 py-3 text-sm transition hover:border-saffron"
               >
-                <span className={open ? '' : 'opacity-30'}>{s.icon}</span>
-                {s.label}
+                <span>
+                  {LANGUAGES.find((l) => l.id === language)?.flag}{' '}
+                  {LANGUAGES.find((l) => l.id === language)?.label}
+                </span>
+                <span className="text-xs font-medium text-saffron">Change</span>
               </button>
-            )
-          })}
-        </nav>
+            ) : (
+              <p className="text-xs text-muted">Chosen right after you upload.</p>
+            )}
 
-        <div className="mt-8 space-y-3 border-t border-line pt-6">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-muted">
-            Language
-          </label>
-          {languageChosen ? (
-            <button
-              onClick={() => setLanguageModalOpen(true)}
-              className="flex w-full items-center justify-between rounded-lg border border-line
-                bg-surface px-3 py-2 text-sm transition hover:border-saffron"
-            >
-              <span>
-                {LANGUAGES.find((l) => l.id === language)?.flag}{' '}
-                {LANGUAGES.find((l) => l.id === language)?.label}
-              </span>
-              <span className="text-xs text-saffron">Change</span>
-            </button>
-          ) : (
-            <p className="text-xs text-muted">Chosen right after you upload.</p>
-          )}
+            {voice && (
+              <button
+                onClick={() => setAutoSpeak((v) => !v)}
+                className={`w-full rounded-xl border px-4 py-2.5 text-xs transition ${
+                  autoSpeak
+                    ? 'border-saffron bg-saffron/10 text-saffron'
+                    : 'border-line text-muted hover:text-[#1D1D1F]'
+                }`}
+              >
+                {autoSpeak ? '🔊 Read answers aloud' : '🔇 Read answers aloud'}
+              </button>
+            )}
 
-          {voice && (
             <button
-              onClick={() => setAutoSpeak((v) => !v)}
-              className={`mt-4 w-full rounded-lg border px-3 py-2 text-xs transition ${
-                autoSpeak
+              onClick={() => setJudgeMode((v) => !v)}
+              className={`w-full rounded-xl border px-4 py-2.5 text-xs transition ${
+                judgeMode
                   ? 'border-saffron bg-saffron/10 text-saffron'
                   : 'border-line text-muted hover:text-[#1D1D1F]'
               }`}
             >
-              {autoSpeak ? '🔊 Read answers aloud' : '🔇 Read answers aloud'}
+              {judgeMode ? '● Judge mode on' : '○ Judge mode'}
             </button>
-          )}
+          </div>
 
-          <button
-            onClick={() => setJudgeMode((v) => !v)}
-            className={`mt-4 w-full rounded-lg border px-3 py-2 text-xs transition ${
-              judgeMode
-                ? 'border-saffron bg-saffron/10 text-saffron'
-                : 'border-line text-muted hover:text-[#1D1D1F]'
-            }`}
-          >
-            {judgeMode ? '● Judge mode on' : '○ Judge mode'}
-          </button>
-        </div>
-
-        {health && (
-          <div className="mt-6 text-xs text-muted">
-            <span
-              className={`mr-1.5 inline-block h-2 w-2 rounded-full ${
-                health.status === 'ok' ? 'bg-leaf' : 'bg-alert'
-              }`}
-            />
-            NIM {health.status === 'ok' ? 'connected' : 'not connected'}
-            {judgeMode && health.nim?.model && (
-              <div className="mt-1 font-mono text-[10px] leading-tight">
-                {health.nim.model}
+          {health && (
+            <div className="space-y-1.5 border-t border-line pt-5 text-xs text-muted">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    health.status === 'ok' ? 'bg-leaf' : 'bg-alert'
+                  }`}
+                />
+                NIM {health.status === 'ok' ? 'connected' : 'not connected'}
               </div>
-            )}
-            <div className="mt-1.5">
-              <span
-                className={`mr-1.5 inline-block h-2 w-2 rounded-full ${
-                  voice ? 'bg-leaf' : 'bg-line'
-                }`}
-              />
-              Voice {voice ? 'ready' : 'off'}
+              {judgeMode && health.nim?.model && (
+                <div className="font-mono text-[10px] leading-tight">{health.nim.model}</div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    voice ? 'bg-leaf' : 'bg-line'
+                  }`}
+                />
+                Voice {voice ? 'ready' : 'off'}
+              </div>
               {judgeMode && voice && health.speech?.detail && (
-                <div className="mt-1 font-mono text-[10px] leading-tight">
-                  {health.speech.detail}
-                </div>
+                <div className="font-mono text-[10px] leading-tight">{health.speech.detail}</div>
               )}
             </div>
-          </div>
-        )}
+          )}
+
+          <RecentChats refreshKey={chatsRefresh} onSelect={openChat} />
+        </div>
       </aside>
 
       {/* Content column */}
@@ -202,6 +217,7 @@ function StudyApp() {
               voice={voice}
               autoSpeak={autoSpeak}
               onTaught={setConcept}
+              onChatSaved={() => setChatsRefresh((n) => n + 1)}
             />
           )}
 
@@ -214,6 +230,7 @@ function StudyApp() {
               voice={voice}
               autoSpeak={autoSpeak}
               onEvaluated={(res) => setDifficulty(res.difficulty.current)}
+              onChatSaved={() => setChatsRefresh((n) => n + 1)}
             />
           )}
 
@@ -251,6 +268,10 @@ function StudyApp() {
         }}
         onClose={() => setLanguageModalOpen(false)}
       />
+
+      {restoredChat && (
+        <RestoredChatModal chat={restoredChat} onClose={() => setRestoredChat(null)} />
+      )}
     </div>
   )
 }

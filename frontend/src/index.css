@@ -26,6 +26,21 @@ body {
     "Noto Sans Tamil", "Noto Sans Devanagari", "Noto Sans Telugu",
     "Noto Sans Malayalam", sans-serif;
   -webkit-font-smoothing: antialiased;
+  position: relative;
+}
+
+/* Soft, fixed color blooms behind the UI — glass surfaces need something
+   underneath them to actually diffuse; a flat background makes blur invisible. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(600px circle at 8% 12%, rgba(0, 122, 255, 0.12), transparent 60%),
+    radial-gradient(520px circle at 92% 18%, rgba(52, 199, 89, 0.1), transparent 60%),
+    radial-gradient(680px circle at 50% 105%, rgba(255, 159, 10, 0.08), transparent 60%);
+  pointer-events: none;
 }
 
 /* Indic scripts need more line height than Latin to stay legible. */

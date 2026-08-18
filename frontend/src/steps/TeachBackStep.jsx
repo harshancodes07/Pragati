@@ -47,6 +47,7 @@ export function TeachBackStep({
   voice,
   autoSpeak,
   onEvaluated,
+  onChatSaved,
 }) {
   const [topic, setTopic] = useState(concept || '')
   const [mode, setMode] = useState('simple')
@@ -84,9 +85,9 @@ export function TeachBackStep({
   const indic = isIndicScript(language)
 
   return (
-    <Reveal className="space-y-5">
+    <Reveal className="space-y-6">
       <header>
-        <h2 className="text-2xl font-semibold">Teach it back</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Teach it back</h2>
         <p className="mt-1 text-sm text-muted">
           Explain the concept in your own words{voice && ' — type it or just say it out loud'}.
           Any language, any grammar. Pragati grades the idea, never the wording.
@@ -177,6 +178,7 @@ export function TeachBackStep({
             language={language}
             documentId={doc.document_id}
             sessionId={doc.session_id}
+            onChatSaved={onChatSaved}
           >
             <Card className="space-y-4">
               <div className="flex items-center gap-3">

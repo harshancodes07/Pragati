@@ -20,9 +20,9 @@ export function ProgressStep({ doc, judgeMode }) {
   }
 
   return (
-    <Reveal className="space-y-5">
+    <Reveal className="space-y-6">
       <header>
-        <h2 className="text-2xl font-semibold">Progress</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Progress</h2>
         <p className="mt-1 text-sm text-muted">How this session has gone so far.</p>
       </header>
 

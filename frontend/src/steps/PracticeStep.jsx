@@ -59,10 +59,10 @@ export function PracticeStep({ doc, language, concept, difficulty, voice }) {
   const resultFor = (id) => graded?.results.find((r) => r.id === id)
 
   return (
-    <Reveal className="space-y-5">
+    <Reveal className="space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold">Practice</h2>
+          <h2 className="text-3xl font-semibold tracking-tight">Practice</h2>
           <p className="mt-1 text-sm text-muted">
             5 multiple choice + 2 short answers, generated from your book.
           </p>

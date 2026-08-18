@@ -5,7 +5,7 @@ import { DoubtChat } from '../components/DoubtChat'
 import { GroundingCard } from '../components/GroundingCard'
 import { MicButton, SpeakButton } from '../components/VoiceButton'
 
-export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught }) {
+export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught, onChatSaved }) {
   const [question, setQuestion] = useState('')
   const [askedQuestion, setAskedQuestion] = useState('')
   const [result, setResult] = useState(null)
@@ -37,9 +37,9 @@ export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught
   }
 
   return (
-    <Reveal className="space-y-5">
+    <Reveal className="space-y-6">
       <header>
-        <h2 className="text-2xl font-semibold">Ask about your book</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Ask about your book</h2>
         <p className="mt-1 text-sm text-muted">
           Ask in Tamil, Tanglish or English — Pragati answers only from your upload.
         </p>
@@ -89,6 +89,7 @@ export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught
             language={language}
             documentId={doc.document_id}
             sessionId={doc.session_id}
+            onChatSaved={onChatSaved}
           >
             <Card className="space-y-3">
               <p

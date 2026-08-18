@@ -105,9 +105,7 @@ export function LandingPage({ onStart }) {
       <header className="sticky top-0 z-30 border-b border-[#E5E5EA]/70 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1D1D1F] text-base text-white">
-              📖
-            </div>
+            <img src="/logo-512.png" alt="Pragati" className="h-9 w-9 rounded-xl object-contain" />
             <div className="leading-tight">
               <div className="text-[15px] font-semibold tracking-tight">Pragati</div>
               <div className="text-[11px] text-[#6E6E73]">பிரகதி</div>

@@ -28,7 +28,7 @@ export function LanguageModal({ open, current, onSelect, onClose, dismissible })
           exit={{ opacity: 0, y: 12, scale: 0.98 }}
           transition={{ duration: 0.2 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-2xl"
+          className="glass-strong w-full max-w-lg rounded-2xl p-6"
         >
           <div className="mb-1 text-2xl">🌐</div>
           <h2 className="text-xl font-semibold">Which language would you like to learn in?</h2>
