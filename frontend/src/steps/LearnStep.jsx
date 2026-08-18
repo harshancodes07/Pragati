@@ -54,7 +54,7 @@ export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught
           }}
           rows={3}
           placeholder="Photosynthesis-na enna?"
-          className="w-full resize-none rounded-xl border border-line bg-ink p-4 text-sm
+          className="w-full resize-none rounded-xl border border-line bg-white p-4 text-sm
             outline-none placeholder:text-muted focus:border-saffron"
         />
         <div className="flex items-center justify-between gap-3">

@@ -75,7 +75,7 @@ export function PracticeStep({ doc, language, concept, difficulty, voice }) {
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="Which concept to practise?"
-          className="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm
+          className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm
             outline-none placeholder:text-muted focus:border-saffron"
         />
         <div className="flex justify-end">
@@ -155,7 +155,7 @@ export function PracticeStep({ doc, language, concept, difficulty, voice }) {
                       rows={3}
                       placeholder="Answer in your own words…"
                       className="w-full resize-none rounded-xl border border-line
-                        bg-ink p-3 text-sm outline-none placeholder:text-muted focus:border-saffron"
+                        bg-white p-3 text-sm outline-none placeholder:text-muted focus:border-saffron"
                     />
                     {voice && !graded && (
                       <MicButton
@@ -174,7 +174,7 @@ export function PracticeStep({ doc, language, concept, difficulty, voice }) {
                 {res && (
                   <div className="ml-8 mt-3 space-y-1.5 border-t border-line pt-3 text-sm">
                     {res.type === 'short_answer' && (
-                      <p className="text-slate-300">
+                      <p className="text-[#1D1D1F]">
                         <span className="text-leaf">Model answer — </span>
                         {res.correct_answer}
                       </p>

@@ -71,7 +71,7 @@ export function DoubtChat({ children, concept, explanation, language, documentId
         onClick={() => setOpen((v) => !v)}
         title={open ? 'Minimize' : 'Ask a doubt about this'}
         className="absolute -bottom-3 -right-3 z-30 flex h-11 w-11 items-center justify-center
-          rounded-full bg-saffron text-lg text-ink shadow-lg shadow-saffron/30 transition
+          rounded-full bg-saffron text-lg text-white shadow-lg shadow-saffron/30 transition
           hover:brightness-110"
       >
         {open ? '✕' : '💬'}
@@ -94,7 +94,7 @@ export function DoubtChat({ children, concept, explanation, language, documentId
               <button
                 onClick={() => setOpen(false)}
                 title="Minimize"
-                className="text-muted hover:text-slate-200"
+                className="text-muted hover:text-[#1D1D1F]"
               >
                 −
               </button>
@@ -116,8 +116,8 @@ export function DoubtChat({ children, concept, explanation, language, documentId
                   <div
                     className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
                       m.role === 'user'
-                        ? 'bg-saffron/15 text-slate-100'
-                        : 'bg-raised text-slate-200'
+                        ? 'bg-saffron/15 text-[#1D1D1F]'
+                        : 'bg-raised text-[#1D1D1F]'
                     }`}
                   >
                     {m.content}
@@ -142,7 +142,7 @@ export function DoubtChat({ children, concept, explanation, language, documentId
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && send()}
                 placeholder="Type your doubt…"
-                className="flex-1 rounded-lg border border-line bg-ink px-3 py-2 text-sm
+                className="flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm
                   outline-none placeholder:text-muted focus:border-saffron"
               />
               <button
@@ -150,7 +150,7 @@ export function DoubtChat({ children, concept, explanation, language, documentId
                 disabled={busy || !input.trim()}
                 title="Send"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-saffron
-                  text-ink transition hover:brightness-110 disabled:cursor-not-allowed
+                  text-white transition hover:brightness-110 disabled:cursor-not-allowed
                   disabled:opacity-40"
               >
                 ➤

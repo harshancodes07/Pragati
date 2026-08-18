@@ -100,7 +100,7 @@ export function UploadStep({ language, onReady }) {
             className={`rounded-lg px-4 py-2 text-sm transition ${
               mode === id
                 ? 'bg-saffron/15 text-saffron'
-                : 'text-muted hover:text-slate-200'
+                : 'text-muted hover:text-[#1D1D1F]'
             }`}
           >
             {label}
@@ -152,9 +152,9 @@ export function UploadStep({ language, onReady }) {
                   <div
                     key={fileKey(f)}
                     className="flex items-center justify-between gap-3 rounded-lg
-                      bg-ink/60 px-3 py-2 text-sm"
+                      bg-raised px-3 py-2 text-sm"
                   >
-                    <span className="truncate text-slate-200">{f.name}</span>
+                    <span className="truncate text-[#1D1D1F]">{f.name}</span>
                     <button
                       onClick={() => removeFile(i)}
                       className="shrink-0 text-muted hover:text-alert"
@@ -181,7 +181,7 @@ export function UploadStep({ language, onReady }) {
             onChange={(e) => setText(e.target.value)}
             rows={10}
             placeholder="Paste a passage from your textbook…"
-            className="w-full resize-none rounded-xl border border-line bg-ink p-4 text-sm
+            className="w-full resize-none rounded-xl border border-line bg-white p-4 text-sm
               outline-none placeholder:text-muted focus:border-saffron"
           />
         )}

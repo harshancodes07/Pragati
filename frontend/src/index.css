@@ -1,22 +1,27 @@
 @import "tailwindcss";
 
+/*
+ * Apple-inspired light theme, shared by the landing page and the study app.
+ * Old dark-theme names (ink/surface/raised/line/muted/saffron/leaf/warn/alert)
+ * are kept as aliases so every existing className keeps working unchanged.
+ */
 @theme {
-  --color-ink: #0e1116;
-  --color-surface: #161b22;
-  --color-raised: #1d242e;
-  --color-line: #2a323d;
-  --color-muted: #8b98a8;
-  --color-saffron: #ff8a3d;
-  --color-leaf: #35c98a;
-  --color-warn: #f2c14e;
-  --color-alert: #ff6b6b;
+  --color-ink: #1d1d1f;
+  --color-surface: #ffffff;
+  --color-raised: #f5f5f7;
+  --color-line: #e5e5ea;
+  --color-muted: #6e6e73;
+  --color-saffron: #007aff;
+  --color-leaf: #34c759;
+  --color-warn: #ff9f0a;
+  --color-alert: #ff3b30;
 }
 
 html, body, #root { height: 100%; }
 
 body {
-  background: var(--color-ink);
-  color: #e8edf3;
+  background: var(--color-raised);
+  color: var(--color-ink);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Noto Sans Tamil", "Noto Sans Devanagari", "Noto Sans Telugu",
     "Noto Sans Malayalam", sans-serif;

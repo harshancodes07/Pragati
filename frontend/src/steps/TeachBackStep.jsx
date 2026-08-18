@@ -108,7 +108,7 @@ export function TeachBackStep({
             >
               <div
                 className={`flex items-center gap-2 text-sm font-medium ${
-                  active ? 'text-saffron' : 'text-slate-200'
+                  active ? 'text-saffron' : 'text-[#1D1D1F]'
                 }`}
               >
                 <span>{m.dot}</span>
@@ -125,7 +125,7 @@ export function TeachBackStep({
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="Which concept? e.g. photosynthesis"
-          className="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm
+          className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm
             outline-none placeholder:text-muted focus:border-saffron"
         />
         <textarea
@@ -133,7 +133,7 @@ export function TeachBackStep({
           onChange={(e) => setExplanation(e.target.value)}
           rows={5}
           placeholder={activeMode.placeholder}
-          className="w-full resize-none rounded-xl border border-line bg-ink p-4 text-sm
+          className="w-full resize-none rounded-xl border border-line bg-white p-4 text-sm
             outline-none placeholder:text-muted focus:border-saffron"
         />
         <div className="flex items-center justify-between gap-3">
@@ -211,7 +211,7 @@ export function TeachBackStep({
                   {result.did_well.map((p, i) => (
                     <li
                       key={i}
-                      className={`flex gap-2 text-sm text-slate-300 ${
+                      className={`flex gap-2 text-sm text-[#1D1D1F] ${
                         indic ? 'script-indic' : ''
                       }`}
                     >
@@ -231,7 +231,7 @@ export function TeachBackStep({
                   {result.improve.map((p, i) => (
                     <li
                       key={i}
-                      className={`flex gap-2 text-sm text-slate-300 ${
+                      className={`flex gap-2 text-sm text-[#1D1D1F] ${
                         indic ? 'script-indic' : ''
                       }`}
                     >
@@ -252,18 +252,18 @@ export function TeachBackStep({
                 {result.misconceptions.map((m, i) => (
                   <div key={i} className="space-y-2 text-sm">
                     {m.student_claim && (
-                      <p className="rounded-lg bg-ink/60 p-3 italic text-slate-400">
+                      <p className="rounded-lg bg-raised p-3 italic text-muted">
                         “{m.student_claim}”
                       </p>
                     )}
                     {m.problem && (
-                      <p className="text-slate-300">
+                      <p className="text-[#1D1D1F]">
                         <span className="text-alert">Why that's wrong — </span>
                         {m.problem}
                       </p>
                     )}
                     {m.correct_concept && (
-                      <p className="text-slate-300">
+                      <p className="text-[#1D1D1F]">
                         <span className="text-leaf">Actually — </span>
                         {m.correct_concept}
                       </p>
@@ -280,7 +280,7 @@ export function TeachBackStep({
                 One way to say it better
               </h4>
               <p
-                className={`text-[15px] leading-relaxed text-slate-300 ${
+                className={`text-[15px] leading-relaxed text-[#1D1D1F] ${
                   indic ? 'script-indic' : ''
                 }`}
               >

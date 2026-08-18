@@ -85,7 +85,7 @@ function ScoreRing({ score, marks }) {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="rounded-xl border border-line bg-ink/60 px-4 py-2 text-center"
+          className="rounded-xl border border-line bg-raised px-4 py-2 text-center"
         >
           <div className="text-xl font-semibold text-saffron tabular-nums">
             {marks} / 5
@@ -105,7 +105,7 @@ function MetricBar({ icon, label, value, delay }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-sm">
-        <span className="flex items-center gap-2 text-slate-300">
+        <span className="flex items-center gap-2 text-[#1D1D1F]">
           <span>{icon}</span>
           {label}
         </span>

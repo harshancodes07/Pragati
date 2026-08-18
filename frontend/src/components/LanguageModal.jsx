@@ -19,7 +19,7 @@ export function LanguageModal({ open, current, onSelect, onClose, dismissible })
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
         onClick={() => dismissible && onClose?.()}
       >
         <motion.div
@@ -51,7 +51,7 @@ export function LanguageModal({ open, current, onSelect, onClose, dismissible })
                   }`}
                 >
                   <div className="text-lg">{l.flag}</div>
-                  <div className={`mt-1 text-sm font-medium ${active ? 'text-saffron' : 'text-slate-200'}`}>
+                  <div className={`mt-1 text-sm font-medium ${active ? 'text-saffron' : 'text-[#1D1D1F]'}`}>
                     {l.label}
                   </div>
                   <div className="text-[11px] text-muted">{l.hint}</div>
@@ -62,7 +62,7 @@ export function LanguageModal({ open, current, onSelect, onClose, dismissible })
 
           <div className="mt-6 flex items-center justify-between gap-3">
             {dismissible ? (
-              <button onClick={onClose} className="text-sm text-muted hover:text-slate-200">
+              <button onClick={onClose} className="text-sm text-muted hover:text-[#1D1D1F]">
                 Cancel
               </button>
             ) : (
@@ -71,7 +71,7 @@ export function LanguageModal({ open, current, onSelect, onClose, dismissible })
             <button
               onClick={() => onSelect(picked)}
               disabled={!picked}
-              className="rounded-xl bg-saffron px-6 py-2.5 text-sm font-semibold text-ink
+              className="rounded-xl bg-saffron px-6 py-2.5 text-sm font-semibold text-white
                 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Continue

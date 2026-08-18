@@ -46,12 +46,12 @@ export function GroundingCard({ sources, retrieval, grounded, judgeMode }) {
 
       <div className="space-y-2.5">
         {sources.map((s) => (
-          <div key={s.chunk_id} className="rounded-lg bg-ink/50 p-3">
+          <div key={s.chunk_id} className="rounded-lg bg-raised p-3">
             <div className="mb-1.5 flex items-center gap-2 text-xs text-muted">
-              <span className="font-semibold text-slate-300">Page {s.page}</span>
+              <span className="font-semibold text-muted">Page {s.page}</span>
               {judgeMode && <span className="font-mono">score {s.score}</span>}
             </div>
-            <p className="text-sm leading-relaxed text-slate-300">
+            <p className="text-sm leading-relaxed text-muted">
               “{s.text.slice(0, 260)}
               {s.text.length > 260 ? '…' : ''}”
             </p>
@@ -90,7 +90,7 @@ function ScoreDetail({ retrieval, refused }) {
           className={`h-2 rounded-full ${refused ? 'bg-warn' : 'bg-leaf'}`}
         />
         <div
-          className="absolute top-[-3px] h-3.5 w-0.5 bg-slate-400"
+          className="absolute top-[-3px] h-3.5 w-0.5 bg-[#8E8E93]"
           style={{ left: `${markerPct}%` }}
         />
       </div>

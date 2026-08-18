@@ -88,7 +88,7 @@ export function MicButton({ onText, language, disabled }) {
             disabled:cursor-not-allowed disabled:opacity-40 ${
               recording
                 ? 'border-saffron bg-saffron/10 text-saffron'
-                : 'border-line text-muted hover:border-muted hover:text-slate-200'
+                : 'border-line text-muted hover:border-muted hover:text-[#1D1D1F]'
             }`}
         >
           {recording ? (
@@ -166,7 +166,7 @@ export function SpeakButton({ text, language, label = 'Listen', autoPlay = false
           disabled:opacity-50 ${
             playing
               ? 'bg-saffron/15 text-saffron'
-              : 'text-muted hover:bg-raised hover:text-slate-200'
+              : 'text-muted hover:bg-raised hover:text-[#1D1D1F]'
           }`}
       >
         {busy ? (

@@ -74,7 +74,7 @@ function StudyApp() {
                     active
                       ? 'bg-saffron/15 font-medium text-saffron'
                       : open
-                        ? 'text-muted hover:bg-raised hover:text-slate-200'
+                        ? 'text-muted hover:bg-raised hover:text-[#1D1D1F]'
                         : 'cursor-not-allowed text-line'
                   }`}
               >
@@ -111,7 +111,7 @@ function StudyApp() {
               className={`mt-4 w-full rounded-lg border px-3 py-2 text-xs transition ${
                 autoSpeak
                   ? 'border-saffron bg-saffron/10 text-saffron'
-                  : 'border-line text-muted hover:text-slate-200'
+                  : 'border-line text-muted hover:text-[#1D1D1F]'
               }`}
             >
               {autoSpeak ? '🔊 Read answers aloud' : '🔇 Read answers aloud'}
@@ -123,7 +123,7 @@ function StudyApp() {
             className={`mt-4 w-full rounded-lg border px-3 py-2 text-xs transition ${
               judgeMode
                 ? 'border-saffron bg-saffron/10 text-saffron'
-                : 'border-line text-muted hover:text-slate-200'
+                : 'border-line text-muted hover:text-[#1D1D1F]'
             }`}
           >
             {judgeMode ? '● Judge mode on' : '○ Judge mode'}
