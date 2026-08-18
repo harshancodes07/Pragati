@@ -1,6 +1,11 @@
+import { lazy, Suspense } from 'react'
 import { motion } from 'framer-motion'
-import { FloatingLanguageLetters } from './components/FloatingLanguageLetters'
 import { LANGUAGES } from './api'
+
+// three.js + @react-three/fiber alone are ~1MB — split into their own chunk
+// so this decorative background never blocks the initial page paint or
+// bloats the bundle for visitors who skip straight to the study app.
+const Antigravity = lazy(() => import('./components/Antigravity'))
 
 /**
  * Marketing entry point, shown before the student ever touches the study
@@ -130,7 +135,22 @@ export function LandingPage({ onStart }) {
 
       {/* Hero */}
       <section className="relative overflow-hidden px-6 pb-28 pt-24 text-center sm:pt-32">
-        <FloatingLanguageLetters />
+        <div className="pointer-events-none absolute inset-0 opacity-70 sm:pointer-events-auto">
+          <Suspense fallback={null}>
+            <Antigravity
+              count={300}
+              magnetRadius={6}
+              ringRadius={6}
+              waveSpeed={0.4}
+              waveAmplitude={1}
+              particleSize={1.1}
+              lerpSpeed={0.05}
+              color="#8aabff"
+              autoAnimate={true}
+              particleVariance={1}
+            />
+          </Suspense>
+        </div>
 
         <motion.div
           initial={{ opacity: 0, y: 14 }}
