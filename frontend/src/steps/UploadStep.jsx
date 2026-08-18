@@ -84,7 +84,7 @@ export function UploadStep({ language, onReady }) {
       <header>
         <h2 className="text-2xl font-semibold">Upload your textbook</h2>
         <p className="mt-1 text-sm text-muted">
-          One or more page photos, a PDF, or just paste the text. Bodhi will
+          One or more page photos, a PDF, or just paste the text. Pragati will
           only ever teach from what you give it here.
         </p>
       </header>

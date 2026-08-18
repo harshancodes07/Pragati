@@ -89,7 +89,7 @@ export function TeachBackStep({
         <h2 className="text-2xl font-semibold">Teach it back</h2>
         <p className="mt-1 text-sm text-muted">
           Explain the concept in your own words{voice && ' — type it or just say it out loud'}.
-          Any language, any grammar. Bodhi grades the idea, never the wording.
+          Any language, any grammar. Pragati grades the idea, never the wording.
         </p>
       </header>
 

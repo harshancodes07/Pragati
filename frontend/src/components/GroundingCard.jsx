@@ -20,7 +20,7 @@ export function GroundingCard({ sources, retrieval, grounded, judgeMode }) {
           <span>⚠</span> Not in your textbook
         </div>
         <p className="mt-1 text-sm text-muted">
-          Bodhi only answers from the book you uploaded, so it refused this one.
+          Pragati only answers from the book you uploaded, so it refused this one.
         </p>
         {judgeMode && retrieval && (
           <ScoreDetail retrieval={retrieval} refused />

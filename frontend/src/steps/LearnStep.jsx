@@ -41,7 +41,7 @@ export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught
       <header>
         <h2 className="text-2xl font-semibold">Ask about your book</h2>
         <p className="mt-1 text-sm text-muted">
-          Ask in Tamil, Tanglish or English — Bodhi answers only from your upload.
+          Ask in Tamil, Tanglish or English — Pragati answers only from your upload.
         </p>
       </header>
 
@@ -68,7 +68,7 @@ export function LearnStep({ doc, language, judgeMode, voice, autoSpeak, onTaught
             <span className="text-xs text-muted">⌘/Ctrl + Enter to ask</span>
           )}
           <Button onClick={() => ask()} disabled={busy || !question.trim()}>
-            {busy ? 'Thinking…' : 'Ask Bodhi'}
+            {busy ? 'Thinking…' : 'Ask Pragati'}
           </Button>
         </div>
       </Card>

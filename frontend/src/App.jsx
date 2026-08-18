@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import { LANGUAGES, api } from './api'
 import { Badge, Card } from './components/common'
 import { LanguageModal } from './components/LanguageModal'
+import { LandingPage } from './LandingPage'
 import { UploadStep } from './steps/UploadStep'
 import { LearnStep } from './steps/LearnStep'
 import { TeachBackStep } from './steps/TeachBackStep'
@@ -17,7 +18,10 @@ const STEPS = [
   { id: 'progress', label: 'Progress', icon: '📈' },
 ]
 
-export default function App() {
+// The dark tutor UI itself — unchanged from before this redesign, aside from
+// the Bodhi → Pragati brand text. Everything else (steps, voice, language
+// modal, judge mode) is preserved exactly as it was.
+function StudyApp() {
   const [step, setStep] = useState('upload')
   const [language, setLanguage] = useState('tanglish')
   const [languageChosen, setLanguageChosen] = useState(false)
@@ -51,7 +55,7 @@ export default function App() {
       <aside className="w-52 shrink-0">
         <div className="mb-8">
           <h1 className="text-xl font-semibold tracking-tight">
-            Bodhi <span className="text-saffron">·</span> போதி
+            Pragati <span className="text-saffron">·</span> பிரகதி
           </h1>
           <p className="mt-1 text-xs text-muted">Your textbook, your language</p>
         </div>
@@ -249,4 +253,14 @@ export default function App() {
       />
     </div>
   )
+}
+
+export default function App() {
+  const [started, setStarted] = useState(false)
+
+  if (!started) {
+    return <LandingPage onStart={() => setStarted(true)} />
+  }
+
+  return <StudyApp />
 }
