@@ -1,4 +1,4 @@
-"""Bodhi language ids -> Sarvam BCP-47 codes, and the Tanglish special case.
+"""Pragati language ids -> Sarvam BCP-47 codes, and the Tanglish special case.
 
 Pure functions, no network. The one place that knows Tanglish is not a language
 Sarvam has ever heard of — it is Tamil wearing a Latin alphabet, and both the
@@ -7,7 +7,7 @@ speech-to-text and text-to-speech sides need to be told so differently.
 
 from __future__ import annotations
 
-# Sarvam speaks all six of Bodhi's languages. Tanglish rides on the Tamil voice.
+# Sarvam speaks all six of Pragati's languages. Tanglish rides on the Tamil voice.
 _CODES = {
     "tanglish": "ta-IN",
     "tamil": "ta-IN",
@@ -21,7 +21,7 @@ _FALLBACK = "en-IN"
 
 
 def bcp47(language: str) -> str:
-    """Sarvam language code for a Bodhi language id."""
+    """Sarvam language code for a Pragati language id."""
     return _CODES.get((language or "").lower(), _FALLBACK)
 
 

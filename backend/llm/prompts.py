@@ -1,4 +1,4 @@
-"""System prompts for Bodhi's three distinct jobs.
+"""System prompts for Pragati's three distinct jobs.
 
 Three prompts, never one mega-prompt: a tutor that teaches, an evaluator that
 grades understanding, and a generator that writes practice. They have different
@@ -83,7 +83,7 @@ asked, say plainly that it is not in the uploaded textbook."""
 # ------------------------------------------------------------------ 1. tutor
 
 def tutor_system_prompt(language: str) -> str:
-    return f"""You are Bodhi, a patient tutor who teaches a student from their own textbook.
+    return f"""You are Pragati, a patient tutor who teaches a student from their own textbook.
 
 {language_rules(language)}
 
@@ -107,7 +107,7 @@ HOW TO TEACH:
 # ------------------------------------------------------------- 1b. doubt chat
 
 def doubt_chat_system_prompt(language: str) -> str:
-    return f"""You are Bodhi, continuing a conversation with a student who just read an
+    return f"""You are Pragati, continuing a conversation with a student who just read an
 explanation you gave them and now has a follow-up doubt about it.
 
 {language_rules(language)}

@@ -1,7 +1,7 @@
 """Block 1 — pick the NIM model with evidence, not guesswork.
 
 Catalog IDs churn, so this script asks the key what it can actually reach, then
-runs six cases that mirror exactly what Bodhi does in the demo. Writes a
+runs six cases that mirror exactly what Pragati does in the demo. Writes a
 scorecard to data/benchmark.json and prints a table.
 
     python -m scripts.benchmark_nim            # list catalog + score candidates

@@ -1,4 +1,4 @@
-"""Bodhi FastAPI app.
+"""Pragati FastAPI app.
 
 Every NIM call happens here or below. The frontend never sees the API key.
 """
@@ -31,7 +31,7 @@ def _elapsed_ms(started: float) -> float:
     return (time.perf_counter() - started) * 1000
 
 
-app = FastAPI(title="Bodhi", version="1.0")
+app = FastAPI(title="Pragati", version="1.0")
 
 app.add_middleware(
     CORSMiddleware,

@@ -20,9 +20,6 @@ const STEPS = [
   { id: 'progress', label: 'Progress', icon: '📈' },
 ]
 
-// The dark tutor UI itself — unchanged from before this redesign, aside from
-// the Bodhi → Pragati brand text. Everything else (steps, voice, language
-// modal, judge mode) is preserved exactly as it was.
 function StudyApp() {
   const [step, setStep] = useState('upload')
   const [language, setLanguage] = useState('tanglish')
@@ -34,7 +31,7 @@ function StudyApp() {
   const [difficulty, setDifficulty] = useState('medium')
   const [health, setHealth] = useState(null)
   const [autoSpeak, setAutoSpeak] = useState(
-    () => localStorage.getItem('bodhi.autoSpeak') === '1',
+    () => localStorage.getItem('pragati.autoSpeak') === '1',
   )
   const [chatsRefresh, setChatsRefresh] = useState(0)
   const [restoredChat, setRestoredChat] = useState(null)
@@ -50,7 +47,7 @@ function StudyApp() {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('bodhi.autoSpeak', autoSpeak ? '1' : '0')
+    localStorage.setItem('pragati.autoSpeak', autoSpeak ? '1' : '0')
   }, [autoSpeak])
 
   // No Sarvam key on the backend means no mic and no speaker anywhere — the app

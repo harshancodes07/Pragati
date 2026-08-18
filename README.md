@@ -1,6 +1,6 @@
-# Bodhi — AI Textbook Tutor in Your Mother Tongue
+# Pragati — AI Textbook Tutor in Your Mother Tongue
 
-**PS-S01.** Upload a textbook page. Bodhi teaches it back in natural
+**PS-S01.** Upload a textbook page. Pragati teaches it back in natural
 Tamil/Tanglish, grounded strictly in your upload, then runs
 *teach back → misconception detection → correction → adaptive practice*.
 

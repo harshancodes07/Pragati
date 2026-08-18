@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     sarvam_tts_speaker: str = "priya"
 
     data_dir: Path = ROOT / "data"
-    db_path: Path = ROOT / "data" / "bodhi.db"
+    db_path: Path = ROOT / "data" / "pragati.db"
 
     @property
     def tutor_model(self) -> str:
